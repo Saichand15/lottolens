@@ -1,0 +1,75 @@
+.history-page { max-width: 1100px; margin: 0 auto; padding: 16px; }
+.hist-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+.hist-title { margin: 0; font-size: 22px; font-weight: 800; }
+.hist-sub { margin: 2px 0 0; font-size: 13px; color: var(--text-muted); }
+.hist-controls { display: flex; gap: 10px; align-items: center; }
+
+.search-input {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  background: var(--bg-white);
+  color: var(--text);
+  width: 240px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.search-input:focus { border-color: var(--accent); }
+
+.sort-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-white);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text);
+  transition: all 0.15s;
+}
+.sort-btn:hover { background: var(--bg); border-color: var(--accent); }
+
+.hist-table-wrap { overflow-x: auto; border-radius: 12px; box-shadow: var(--shadow-sm); }
+
+.hist-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-white);
+  font-size: 13px;
+}
+
+.hist-table th {
+  padding: 10px 12px;
+  background: var(--bg);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+
+.hist-table td { padding: 7px 12px; text-align: center; border-bottom: 1px solid var(--border); }
+.row-even { background: var(--bg-white); }
+.row-odd { background: var(--bg); }
+
+.td-idx { color: var(--text-muted); font-size: 11px; }
+.td-id { font-weight: 700; color: var(--accent); }
+.td-sum { font-weight: 600; color: var(--text-muted); }
+
+.ball-hist {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text);
+}
+
+td.highlighted .ball-hist { background: var(--accent); color: #fff; border-color: var(--accent); }
