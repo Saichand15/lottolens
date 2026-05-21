@@ -19,6 +19,7 @@
   align-items: center;
   gap: 10px;
   text-decoration: none;
+  flex-shrink: 0;
 }
 
 .brand-icon { font-size: 22px; }
@@ -57,6 +58,66 @@
   background: var(--success);
   color: #fff;
   font-weight: 600;
+}
+
+/* Powerball nav links */
+.nav-link-pb.active { background: #ef4444; color: #fff; }
+.nav-link-pb:last-child { background: #ef4444; color: #fff; }
+
+/* Mega Millions nav links */
+.nav-link-mm.active { background: #f59e0b; color: #fff; }
+.nav-link-mm:last-child { background: #f59e0b; color: #fff; }
+
+/* Home hint */
+.nav-link-home {
+  background: none !important;
+  color: var(--text-muted) !important;
+  font-style: italic;
+  cursor: default;
+  font-size: 13px;
+}
+
+/* Game Switcher */
+.navbar-switcher {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
+}
+
+.switcher-btn {
+  padding: 5px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.switcher-btn:hover { background: var(--bg-white); color: var(--text); }
+
+.switcher-active {
+  background: var(--accent);
+  color: #fff !important;
+}
+
+.switcher-active-pb {
+  background: #ef4444 !important;
+  color: #fff !important;
+}
+
+.switcher-active-mm {
+  background: #f59e0b !important;
+  color: #fff !important;
+}
+
+@media (max-width: 900px) {
+  .navbar-switcher { display: none; }
 }
 
 .nav-link:last-child:hover { opacity: 0.85; }

@@ -6,8 +6,6 @@ export const CELL_H = 20
 export const LABEL_W = 34
 export const HEADER_H = 26
 
-const NUMBERS = Array.from({ length: 45 }, (_, i) => i + 1)
-
 // ─── Single cell ─────────────────────────────────────────────────────────────
 const GridCell = memo(function GridCell({
   appeared, rowBg, isLatest, isSelected, isNumHighlight, onClick, number
@@ -43,8 +41,10 @@ export default function Grid({
   activeDir,
   onCellClick,
   onNumberClick,
-  rowColors       // { [n]: cssColor } gap-based
+  rowColors,      // { [n]: cssColor } gap-based
+  maxNumber = 45  // 45 for lotto, 69 for powerball
 }) {
+  const NUMBERS = Array.from({ length: maxNumber }, (_, i) => i + 1)
   const scrollRef = useRef(null)
   const offset = (allDraws?.length || 0) - draws.length
 

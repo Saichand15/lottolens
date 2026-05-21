@@ -1,0 +1,156 @@
+/* ── Powerball Dashboard ──────────────────────────────────────────────── */
+.pb-dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.pb-dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pb-dash-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pb-icon { font-size: 22px; }
+.pb-dash-sub { margin: 2px 0 0; font-size: 13px; color: var(--text-muted); }
+
+.pb-btn-add {
+  padding: 8px 20px;
+  background: #ef4444;
+  color: #fff;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+.pb-btn-add:hover { opacity: 0.85; }
+
+/* Cards */
+.pb-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.pb-card {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.pb-card-latest { border-top: 3px solid #ef4444; }
+.pb-card-pred   { border-top: 3px solid #f59e0b; }
+.pb-card-stats  { border-top: 3px solid var(--accent); }
+
+.pb-card-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.pb-card-sub { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+.pb-link-action { color: var(--accent); text-decoration: none; font-weight: 600; display: block; margin-top: 10px; }
+.pb-link-action:hover { text-decoration: underline; }
+
+/* Balls */
+.pb-ball-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+.pb-ball-row-wrap { flex-wrap: wrap; gap: 10px; }
+
+.pb-ball {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 13px;
+  flex-shrink: 0;
+}
+
+.pb-ball-white {
+  background: #fff;
+  color: #1e1e2e;
+  border: 2px solid #e5e7eb;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+.pb-ball-red   { background: #ef4444; color: #fff; font-size: 15px; width: 42px; height: 42px; }
+.pb-ball-pred  { background: #f59e0b; color: #fff; }
+.pb-ball-pred-red { background: #ef4444; color: #fff; }
+.pb-ball-hot   { background: #ef4444; color: #fff; }
+.pb-ball-cold  { background: #3b82f6; color: #fff; }
+
+.pb-pred-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.pb-pred-score { font-size: 10px; color: var(--text-muted); font-weight: 600; }
+
+.pb-num-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.pb-num-count { font-size: 10px; color: var(--text-muted); font-weight: 600; }
+
+/* Stats grid */
+.pb-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+.pb-stat { display: flex; flex-direction: column; gap: 2px; }
+.pb-stat-val { font-size: 24px; font-weight: 800; color: var(--accent); line-height: 1; }
+.pb-stat-lbl { font-size: 10px; color: var(--text-muted); }
+
+/* Mid row */
+.pb-mid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Zone bars */
+.pb-zones { display: flex; flex-direction: column; gap: 10px; }
+.pb-zone { display: grid; grid-template-columns: 60px 1fr 90px; align-items: center; gap: 10px; }
+.pb-zone-label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.pb-zone-bar-wrap { background: var(--bg); border-radius: 4px; height: 10px; overflow: hidden; }
+.pb-zone-bar { height: 100%; background: linear-gradient(90deg, #ef4444, #f59e0b); border-radius: 4px; transition: width 0.4s; }
+.pb-zone-val { font-size: 12px; font-weight: 600; color: var(--text); }
+.pb-zone-val span { color: var(--text-muted); font-weight: 400; }
+
+/* Quick links */
+.pb-quick-links {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pb-ql-btn {
+  padding: 10px 20px;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  transition: all 0.15s;
+}
+.pb-ql-btn:hover { background: var(--bg); border-color: var(--accent); color: var(--accent); }
+.pb-ql-add { background: #ef4444; color: #fff; border-color: #ef4444; }
+.pb-ql-add:hover { background: #dc2626; border-color: #dc2626; color: #fff; }
+
+@media (max-width: 640px) {
+  .pb-mid { grid-template-columns: 1fr; }
+  .pb-stats-grid { grid-template-columns: 1fr 1fr; }
+}

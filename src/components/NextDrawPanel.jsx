@@ -6,7 +6,7 @@ const W_FREQ   = 0.20   // historical appearance frequency
 const W_LASER  = 0.20   // how many laser beams from last draw hit this number
 const W_GAP    = 0.10   // gap bonus (overdue numbers)
 
-export default function NextDrawPanel({ draws, transMatrix, coOccur, gapMap, onClose }) {
+export default function NextDrawPanel({ draws, transMatrix, coOccur, gapMap, onClose, maxNumber = 45 }) {
   const [show, setShow] = useState(true)
 
   const prediction = useMemo(() => {
@@ -17,18 +17,18 @@ export default function NextDrawPanel({ draws, transMatrix, coOccur, gapMap, onC
     const totalDraws = draws.length
     // Appearance freq 0-100
     const appFreq = {}
-    for (let n = 1; n <= 45; n++)
+    for (let n = 1; n <= maxNumber; n++)
       appFreq[n] = +((coOccur.appearances?.[n] || 0) / totalDraws * 100).toFixed(1)
 
     // Gap score: draws since last seen (capped at 50)
     const gapScore = {}
-    for (let n = 1; n <= 45; n++)
+    for (let n = 1; n <= maxNumber; n++)
       gapScore[n] = Math.min((gapMap?.[n] || 0), 50)
     const maxGap = Math.max(...Object.values(gapScore), 1)
 
     // Transition scores from each seed in last draw
     const transScores = {}
-    for (let n = 1; n <= 45; n++) transScores[n] = 0
+    for (let n = 1; n <= maxNumber; n++) transScores[n] = 0
     lastDraw.forEach(seed => {
       const rates = transMatrix?.rates?.[seed] || {}
       Object.entries(rates).forEach(([to, rate]) => {
@@ -40,7 +40,7 @@ export default function NextDrawPanel({ draws, transMatrix, coOccur, gapMap, onC
     // Laser beam hits: fire NE (+1col -1row) and SE (+1col +1row) from ALL last draw seeds
     // Step 1 = direct D334 diagonal neighbor
     const laserHits = {}
-    for (let n = 1; n <= 45; n++) laserHits[n] = { count: 0, dirs: [] }
+    for (let n = 1; n <= maxNumber; n++) laserHits[n] = { count: 0, dirs: [] }
     lastDraw.forEach(seed => {
       const rowIdx = seed - 1
       // NE: row-1
@@ -48,19 +48,20 @@ export default function NextDrawPanel({ draws, transMatrix, coOccur, gapMap, onC
       if (neRow >= 0) { laserHits[neRow + 1].count++; laserHits[neRow + 1].dirs.push('NE') }
       // SE: row+1
       const seRow = rowIdx + 1
-      if (seRow < 45) { laserHits[seRow + 1].count++; laserHits[seRow + 1].dirs.push('SE') }
+      if (seRow < maxNumber) { laserHits[seRow + 1].count++; laserHits[seRow + 1].dirs.push('SE') }
       // Also step 2,3 with diminishing weight
       for (let step = 2; step <= 5; step++) {
         const w = 0.5 / step
         const nr = rowIdx - step; if (nr >= 0) laserHits[nr + 1].count += w
-        const sr = rowIdx + step; if (sr < 45) laserHits[sr + 1].count += w
+        const sr = rowIdx + step; if (sr < maxNumber) laserHits[sr + 1].count += w
       }
     })
     const maxLaser = Math.max(...Object.values(laserHits).map(l => l.count), 1)
+    const maxNumber_ = maxNumber
 
     // Final score per number
     const scores = []
-    for (let n = 1; n <= 45; n++) {
+    for (let n = 1; n <= maxNumber_; n++) {
       if (lastDraw.includes(n)) continue  // skip seeds themselves
       const tScore  = (transScores[n] / maxTrans) * 100
       const fScore  = appFreq[n]

@@ -18,7 +18,7 @@ export default function Dashboard() {
 
   if (loading) return <div className="page-loading"><div className="spinner"/><span>Loading draws…</span></div>
   if (error) return <div className="page-error">⚠ {error} — <em>Have you created the draws table in Supabase?</em></div>
-  if (!draws.length) return <div className="page-error">No draws yet. <Link to="/add">Add the first draw →</Link></div>
+  if (!draws.length) return <div className="page-error">No draws yet. <Link to="/lotto/add">Add the first draw →</Link></div>
 
   const latest = draws[draws.length - 1]
   const prev   = draws.length >= 2 ? draws[draws.length - 2] : null
@@ -40,7 +40,7 @@ export default function Dashboard() {
           <h1 className="dash-title">Dashboard</h1>
           <p className="dash-sub">{draws.length} draws loaded · latest D{latest.id}</p>
         </div>
-        <Link to="/add" className="btn-add">+ Add D{nextId}</Link>
+        <Link to="/lotto/add" className="btn-add">+ Add D{nextId}</Link>
       </div>
 
       {/* Cards row */}
@@ -67,7 +67,7 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-          <Link to="/ticket" className="card-sub link-action">Build full ticket →</Link>
+          <Link to="/lotto/ticket" className="card-sub link-action">Build full ticket →</Link>
         </div>
 
         {/* Stats */}

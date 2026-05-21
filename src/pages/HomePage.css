@@ -1,0 +1,141 @@
+/* ── HomePage ────────────────────────────────────────────────────────── */
+.home-page {
+  min-height: calc(100vh - 56px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  gap: 40px;
+}
+
+.home-hero { text-align: center; }
+
+.home-title {
+  font-size: 36px;
+  font-weight: 900;
+  color: var(--text);
+  margin-bottom: 10px;
+  letter-spacing: -1px;
+}
+.home-title span { color: var(--accent); }
+
+.home-sub {
+  font-size: 16px;
+  color: var(--text-muted);
+  max-width: 480px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* Cards */
+.home-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+  width: 100%;
+  max-width: 1160px;
+}
+
+.home-card {
+  position: relative;
+  background: var(--bg-white);
+  border: 2px solid var(--border);
+  border-radius: 20px;
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.home-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+}
+
+.home-card-lotto:hover { border-color: var(--accent); }
+.home-card-pb:hover    { border-color: #ef4444; }
+.home-card-mm:hover    { border-color: #f59e0b; }
+
+/* Glow bg effect */
+.home-card-glow {
+  position: absolute;
+  top: -40px; right: -40px;
+  width: 160px; height: 160px;
+  border-radius: 50%;
+  opacity: 0.08;
+  pointer-events: none;
+}
+.home-card-glow-lotto { background: var(--accent); }
+.home-card-glow-pb    { background: #ef4444; }
+.home-card-glow-mm    { background: #f59e0b; }
+
+.home-card-icon {
+  font-size: 44px;
+  line-height: 1;
+}
+
+.home-card-body { display: flex; flex-direction: column; gap: 8px; }
+
+.home-card-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.home-card-desc {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.home-card-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.home-tag {
+  padding: 3px 10px;
+  background: rgba(79,70,229,0.1);
+  color: var(--accent);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.home-tag-pb {
+  background: rgba(239,68,68,0.1);
+  color: #ef4444;
+}
+
+.home-tag-mm {
+  background: rgba(245,158,11,0.12);
+  color: #b45309;
+}
+
+.home-card-arrow {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: all 0.2s;
+}
+.home-card-arrow-pb { color: #ef4444; }
+.home-card-arrow-mm { color: #f59e0b; }
+.home-card:hover .home-card-arrow { opacity: 1; transform: translateX(0); }
+
+.home-footer {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 480px;
+}

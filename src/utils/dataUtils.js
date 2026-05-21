@@ -23,10 +23,10 @@ export function buildTransitionMatrix(draws) {
 }
 
 // Co-occurrence: same draw
-export function buildCoOccurrence(draws) {
+export function buildCoOccurrence(draws, maxNumber = 45) {
   const coOccur = {}
   const appearances = {}
-  for (let n = 1; n <= 45; n++) { coOccur[n] = {}; appearances[n] = 0 }
+  for (let n = 1; n <= maxNumber; n++) { coOccur[n] = {}; appearances[n] = 0 }
   draws.forEach(draw => {
     draw.forEach(n => { appearances[n]++ })
     for (let i = 0; i < draw.length; i++) {
@@ -38,7 +38,7 @@ export function buildCoOccurrence(draws) {
     }
   })
   const friends = {}
-  for (let n = 1; n <= 45; n++) {
+  for (let n = 1; n <= maxNumber; n++) {
     friends[n] = Object.entries(coOccur[n])
       .map(([m, cnt]) => ({
         num: +m, count: cnt,
@@ -51,10 +51,10 @@ export function buildCoOccurrence(draws) {
 }
 
 // Gap map
-export function buildGapMap(draws) {
+export function buildGapMap(draws, maxNumber = 45) {
   const N = draws.length
   const gaps = {}
-  for (let n = 1; n <= 45; n++) {
+  for (let n = 1; n <= maxNumber; n++) {
     let lastSeen = -1
     for (let i = N - 1; i >= 0; i--) {
       if (draws[i].includes(n)) { lastSeen = i; break }
