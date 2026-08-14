@@ -50,6 +50,45 @@
 
 .hdr-stat-row { display: flex; gap: 12px; }
 
+.matrix-friend-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  background: linear-gradient(90deg, #071a18, #0f172a);
+  border-bottom: 1px solid rgba(56,248,168,0.25);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.mfb-title {
+  font-size: 11px;
+  font-weight: 900;
+  color: #38f8a8;
+  white-space: nowrap;
+  margin-right: 4px;
+}
+.mfb-chip {
+  border: 1px solid rgba(76,201,240,0.35);
+  background: rgba(76,201,240,0.08);
+  color: #b6f7ff;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mfb-chip.hot {
+  background: linear-gradient(135deg, #38f8a8, #facc15);
+  color: #08111a;
+  border-color: #facc15;
+}
+.mfb-chip small {
+  margin-left: 4px;
+  opacity: 0.75;
+  font-size: 9px;
+}
+
 /* Count selector */
 .count-selector {
   display: flex;

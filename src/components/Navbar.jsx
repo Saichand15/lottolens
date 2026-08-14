@@ -39,8 +39,10 @@ export default function Navbar() {
         {isLotto && (
           <>
             <NavLink to="/lotto" end className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>Dashboard</NavLink>
+            <NavLink to="/lotto/auto" className={({ isActive }) => isActive ? 'nav-link active nav-link-predict' : 'nav-link nav-link-predict'}>🧠 Auto Next</NavLink>
             <NavLink to="/lotto/predict" className={({ isActive }) => isActive ? 'nav-link active nav-link-predict' : 'nav-link nav-link-predict'}>Predict</NavLink>
             <NavLink to="/lotto/matrix" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>Matrix</NavLink>
+            <NavLink to="/lotto/hotgrid" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>🔥 Hot Grid</NavLink>
             <NavLink to="/lotto/ticket" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>Ticket</NavLink>
             <NavLink to="/lotto/history" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>History</NavLink>
             <NavLink to="/lotto/analysis" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>Analysis</NavLink>

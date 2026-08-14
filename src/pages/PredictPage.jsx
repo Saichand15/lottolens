@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { fetchAllDraws } from '../lib/supabase'
-import { computeFullPrediction } from '../utils/predictionEngine'
+import { computeHybridPrediction } from '../utils/hybridPrediction'
 import AiChat from '../components/AiChat'
 import './PredictPage.css'
 
@@ -32,7 +32,7 @@ export default function PredictPage() {
       })
   }, [])
 
-  const prediction = useMemo(() => draws.length >= 2 ? computeFullPrediction(draws) : null, [draws])
+  const prediction = useMemo(() => draws.length >= 2 ? computeHybridPrediction(draws) : null, [draws])
 
   // Accuracy check: for the last 10 draws, how many top-10 predictions appeared?
   const accuracy = useMemo(() => {
@@ -41,7 +41,7 @@ export default function PredictPage() {
     for (let i = draws.length - 1; i >= Math.max(1, draws.length - 10); i--) {
       const past = draws.slice(0, i)
       const actual = draws[i]
-      const pred = computeFullPrediction(past)
+      const pred = computeHybridPrediction(past)
       if (!pred) continue
       const top10 = pred.results.slice(0, 10).map(r => r.number)
       const top15 = pred.results.slice(0, 15).map(r => r.number)

@@ -399,12 +399,6 @@ export function computeLaserHits(displayDraws, colIdx, rowNum) {
   const rowIdx = rowNum - 1  // 0-indexed (number 1 = row 0)
   const numCols = displayDraws.length
   const drawSets = displayDraws.map(d => new Set(Array.isArray(d) ? d : d.numbers))
-  console.log('[LaserHits] colIdx=', colIdx, 'rowNum=', rowNum, 'numCols=', numCols)
-  // Debug: check step 7 NW and SW
-  const nwci = colIdx - 7, nwn = rowNum - 7
-  const swci = colIdx - 7, swn = rowNum + 7
-  console.log('[LaserHits] NW step7: ci=', nwci, 'n=', nwn, 'draw=', displayDraws[nwci]?.slice ? displayDraws[nwci] : displayDraws[nwci]?.numbers, 'has?', drawSets[nwci]?.has(nwn))
-  console.log('[LaserHits] SW step7: ci=', swci, 'n=', swn, 'has?', drawSets[swci]?.has(swn))
   const DIRS = {
     NE: { dc: +1, dr: -1 },
     NW: { dc: -1, dr: -1 },

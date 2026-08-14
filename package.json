@@ -6,7 +6,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "sync:mm": "node scripts/sync-megamillions-history.mjs"
+    "sync:lotto": "node scripts/sync-lottolens-history.mjs",
+    "sync:mm": "node scripts/sync-megamillions-history.mjs",
+    "sync:pb": "node scripts/sync-powerball-lotteryextreme.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.104.0",

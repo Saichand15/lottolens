@@ -3,12 +3,14 @@ import Navbar from './components/Navbar'
 import HomePage from './pages/HomePage'
 import Dashboard from './pages/Dashboard'
 import MatrixPage from './pages/MatrixPage'
+import HotGrid from './pages/HotGrid'
 import TicketBuilder from './pages/TicketBuilder'
 import History from './pages/History'
 import Analysis from './pages/Analysis'
 import AddResult from './pages/AddResult'
 import NumberInspector from './pages/NumberInspector'
 import PredictPage from './pages/PredictPage'
+import AutoSequence from './pages/AutoSequence'
 import BeamConsensus from './pages/BeamConsensus'
 import PBDashboard from './pages/powerball/PBDashboard'
 import PBPredict from './pages/powerball/PBPredict'
@@ -34,8 +36,10 @@ export default function App() {
           <Route path="/"  element={<HomePage />} />
           {/* LottoLens routes */}
           <Route path="/lotto"           element={<Dashboard />} />
+          <Route path="/lotto/auto"      element={<AutoSequence />} />
           <Route path="/lotto/predict"   element={<PredictPage />} />
           <Route path="/lotto/matrix"    element={<MatrixPage />} />
+          <Route path="/lotto/hotgrid"   element={<HotGrid />} />
           <Route path="/lotto/ticket"    element={<TicketBuilder />} />
           <Route path="/lotto/history"   element={<History />} />
           <Route path="/lotto/analysis"  element={<Analysis />} />

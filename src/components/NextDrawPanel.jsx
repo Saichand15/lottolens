@@ -1,4 +1,5 @@
 ﻿import { useMemo, useState } from 'react'
+import { computeHybridPrediction } from '../utils/hybridPrediction'
 
 // Score weights
 const W_TRANS  = 0.50   // transition rate from last draw seeds
@@ -11,85 +12,23 @@ export default function NextDrawPanel({ draws, transMatrix, coOccur, gapMap, onC
 
   const prediction = useMemo(() => {
     if (!draws?.length || !transMatrix || !coOccur) return null
-    const lastDraw  = draws[draws.length - 1]  // e.g. D333 numbers
-    const nextDrawN = draws.length + 1          // D334
-
-    const totalDraws = draws.length
-    // Appearance freq 0-100
-    const appFreq = {}
-    for (let n = 1; n <= maxNumber; n++)
-      appFreq[n] = +((coOccur.appearances?.[n] || 0) / totalDraws * 100).toFixed(1)
-
-    // Gap score: draws since last seen (capped at 50)
-    const gapScore = {}
-    for (let n = 1; n <= maxNumber; n++)
-      gapScore[n] = Math.min((gapMap?.[n] || 0), 50)
-    const maxGap = Math.max(...Object.values(gapScore), 1)
-
-    // Transition scores from each seed in last draw
-    const transScores = {}
-    for (let n = 1; n <= maxNumber; n++) transScores[n] = 0
-    lastDraw.forEach(seed => {
-      const rates = transMatrix?.rates?.[seed] || {}
-      Object.entries(rates).forEach(([to, rate]) => {
-        transScores[+to] = (transScores[+to] || 0) + rate
-      })
-    })
-    const maxTrans = Math.max(...Object.values(transScores), 1)
-
-    // Laser beam hits: fire NE (+1col -1row) and SE (+1col +1row) from ALL last draw seeds
-    // Step 1 = direct D334 diagonal neighbor
-    const laserHits = {}
-    for (let n = 1; n <= maxNumber; n++) laserHits[n] = { count: 0, dirs: [] }
-    lastDraw.forEach(seed => {
-      const rowIdx = seed - 1
-      // NE: row-1
-      const neRow = rowIdx - 1
-      if (neRow >= 0) { laserHits[neRow + 1].count++; laserHits[neRow + 1].dirs.push('NE') }
-      // SE: row+1
-      const seRow = rowIdx + 1
-      if (seRow < maxNumber) { laserHits[seRow + 1].count++; laserHits[seRow + 1].dirs.push('SE') }
-      // Also step 2,3 with diminishing weight
-      for (let step = 2; step <= 5; step++) {
-        const w = 0.5 / step
-        const nr = rowIdx - step; if (nr >= 0) laserHits[nr + 1].count += w
-        const sr = rowIdx + step; if (sr < maxNumber) laserHits[sr + 1].count += w
-      }
-    })
-    const maxLaser = Math.max(...Object.values(laserHits).map(l => l.count), 1)
-    const maxNumber_ = maxNumber
-
-    // Final score per number
-    const scores = []
-    for (let n = 1; n <= maxNumber_; n++) {
-      if (lastDraw.includes(n)) continue  // skip seeds themselves
-      const tScore  = (transScores[n] / maxTrans) * 100
-      const fScore  = appFreq[n]
-      const lScore  = (laserHits[n].count / maxLaser) * 100
-      const gScore  = (gapScore[n] / maxGap) * 100
-      const final   = +(W_TRANS * tScore + W_FREQ * fScore + W_LASER * lScore + W_GAP * gScore).toFixed(1)
-      scores.push({
-        number: n,
-        score: final,
-        transScore: +tScore.toFixed(1),
-        freq: appFreq[n],
-        laserCount: +laserHits[n].count.toFixed(1),
-        laserDirs: [...new Set(laserHits[n].dirs)],
-        gap: gapMap?.[n] || 0
-      })
+    const pred = computeHybridPrediction(draws, { maxNum: maxNumber })
+    if (!pred) return null
+    return {
+      top: pred.results.slice(0, 15).map(r => ({
+        number: r.number,
+        score: r.score,
+        transScore: r.transScore,
+        freq: r.freq,
+        laserCount: r.laserDirect + r.laserCorner,
+        laserDirs: r.reasons.filter(x => String(x).startsWith('nese')).length ? ['NE/SE'] : [],
+        gap: r.gap,
+        tier: r.tier,
+      })),
+      nextDrawN: pred.nextDrawNum,
+      lastDraw: pred.seeds,
+      maxScore: pred.results[0]?.score || 1
     }
-    scores.sort((a, b) => b.score - a.score)
-
-    // Tier classification
-    const top = scores.slice(0, 15)
-    const maxScore = top[0]?.score || 1
-    top.forEach(s => {
-      if (s.score >= maxScore * 0.85) s.tier = 'hot'
-      else if (s.score >= maxScore * 0.65) s.tier = 'warm'
-      else s.tier = 'cold'
-    })
-
-    return { top, nextDrawN, lastDraw, maxScore }
   }, [draws, transMatrix, coOccur, gapMap])
 
   if (!prediction) return null

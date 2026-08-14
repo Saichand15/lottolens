@@ -8,10 +8,11 @@ export const HEADER_H = 26
 
 // ─── Single cell ─────────────────────────────────────────────────────────────
 const GridCell = memo(function GridCell({
-  appeared, rowBg, isLatest, isSelected, isNumHighlight, onClick, number
+  appeared, rowBg, isLatest, isSelected, isNumHighlight, isFriendHighlight, friendRank, onClick, number
 }) {
   let bg = rowBg
   if (appeared && isNumHighlight) bg = '#ffe066'
+  else if (appeared && isFriendHighlight) bg = friendRank <= 3 ? '#38f8a8' : '#4cc9f0'
   else if (appeared) bg = '#FFD700'
   else if (isLatest) bg = 'rgba(255,215,0,0.07)'
 
@@ -22,6 +23,8 @@ const GridCell = memo(function GridCell({
         appeared ? 'gc-app' : '',
         isSelected ? 'gc-sel' : '',
         isNumHighlight && appeared ? 'gc-nhigh' : '',
+        isFriendHighlight && appeared ? 'gc-friend' : '',
+        isFriendHighlight && appeared && friendRank <= 3 ? 'gc-friend-hot' : '',
         isLatest ? 'gc-latest' : ''
       ].join(' ')}
       style={{ background: bg }}
@@ -42,6 +45,7 @@ export default function Grid({
   onCellClick,
   onNumberClick,
   rowColors,      // { [n]: cssColor } gap-based
+  friendshipRanks, // { [n]: { rank, score, label } } close friends of selectedNumber
   maxNumber = 45  // 45 for lotto, 69 for powerball
 }) {
   const NUMBERS = Array.from({ length: maxNumber }, (_, i) => i + 1)
@@ -70,20 +74,28 @@ export default function Grid({
         <div className="lbl-header" style={{ height: HEADER_H }}>
           <span>N</span>
         </div>
-        {NUMBERS.map(n => (
-          <div
-            key={n}
-            className={`row-lbl ${selectedNumber === n ? 'row-lbl-active' : ''}`}
-            style={{
-              height: CELL_H,
-              background: selectedNumber === n ? '#1a1a40' : (rowColors?.[n] || '#111128')
-            }}
-            onClick={() => onNumberClick(n)}
-            title={`Click to highlight all draws with #${n}`}
-          >
-            {n}
-          </div>
-        ))}
+        {NUMBERS.map(n => {
+          const friend = friendshipRanks?.[n]
+          return (
+            <div
+              key={n}
+              className={`row-lbl ${selectedNumber === n ? 'row-lbl-active' : ''} ${friend ? 'row-lbl-friend' : ''} ${friend?.rank <= 3 ? 'row-lbl-friend-hot' : ''}`}
+              style={{
+                height: CELL_H,
+                background: selectedNumber === n
+                  ? '#1a1a40'
+                  : friend
+                    ? `linear-gradient(90deg, rgba(56,248,168,${friend.rank <= 3 ? 0.7 : 0.45}), ${rowColors?.[n] || '#111128'})`
+                    : (rowColors?.[n] || '#111128')
+              }}
+              onClick={() => onNumberClick(n)}
+              title={friend ? `#${n} close friend of #${selectedNumber}: rank ${friend.rank}, score ${friend.score.toFixed(1)} (${friend.label})` : `Click to highlight all draws with #${n}`}
+            >
+              <span>{n}</span>
+              {friend && <small className="row-friend-rank">{friend.rank}</small>}
+            </div>
+          )
+        })}
       </div>
 
       {/* ── Scrollable columns ── */}
@@ -114,6 +126,7 @@ export default function Grid({
                 const isLatest = ci === draws.length - 1
                 const isSelected = selectedCell?.colIdx === ci && selectedCell?.rowNum === n
                 const isNumHigh = selectedNumber === n && appeared
+                const friend = friendshipRanks?.[n]
                 return (
                   <GridCell
                     key={ci}
@@ -122,6 +135,8 @@ export default function Grid({
                     isLatest={isLatest}
                     isSelected={isSelected}
                     isNumHighlight={isNumHigh}
+                    isFriendHighlight={Boolean(friend)}
+                    friendRank={friend?.rank || 0}
                     onClick={() => handleCellClick(ci, n)}
                     number={n}
                   />

@@ -15,6 +15,41 @@ import './MatrixPage.css'
 
 const COUNT_OPTIONS = [60, 100, 200, 'ALL']
 
+function buildCloseFriendship(draws, selectedNumber, coOccur, transMatrix) {
+  if (!draws?.length || !selectedNumber || !coOccur) return []
+  const recent = draws.slice(-80)
+  const sameDrawRecent = {}
+  recent.forEach(draw => {
+    if (!draw.includes(selectedNumber)) return
+    draw.forEach(n => {
+      if (n !== selectedNumber) sameDrawRecent[n] = (sameDrawRecent[n] || 0) + 1
+    })
+  })
+
+  const allFriends = new Map((coOccur.friends?.[selectedNumber] || []).map(f => [f.num, f]))
+  const out = []
+  for (let n = 1; n <= 45; n++) {
+    if (n === selectedNumber) continue
+    const same = allFriends.get(n)
+    const coRate = same?.rate || 0
+    const coCount = same?.count || 0
+    const sentTo = transMatrix?.rates?.[selectedNumber]?.[n] || 0
+    const sentFrom = transMatrix?.rates?.[n]?.[selectedNumber] || 0
+    const recentCount = sameDrawRecent[n] || 0
+    const neighborTalk = Math.max(0, 4 - Math.abs(n - selectedNumber)) * 1.5
+    const score = coRate * 1.15 + sentTo * 0.9 + sentFrom * 0.65 + recentCount * 5 + Math.min(coCount, 20) * 0.45 + neighborTalk
+    if (score <= 0) continue
+    const label = [
+      coRate ? `same ${coRate}%` : null,
+      sentTo ? `→ ${sentTo}%` : null,
+      sentFrom ? `← ${sentFrom}%` : null,
+      recentCount ? `recent ${recentCount}` : null,
+    ].filter(Boolean).join(' · ')
+    out.push({ num: n, score, coRate, coCount, sentTo, sentFrom, recentCount, label })
+  }
+  return out.sort((a, b) => b.score - a.score || b.recentCount - a.recentCount || a.num - b.num).slice(0, 12)
+}
+
 export default function MatrixPage() {
   const [draws, setDraws] = useState([])
   const [loading, setLoading] = useState(true)
@@ -51,6 +86,15 @@ export default function MatrixPage() {
     for (let n = 1; n <= 45; n++) c[n] = gapToRowColor(gapMap[n])
     return c
   }, [gapMap])
+  const closeFriends = useMemo(
+    () => buildCloseFriendship(draws, selectedNumber, coOccur, transMatrix),
+    [draws, selectedNumber, coOccur, transMatrix]
+  )
+  const friendshipRanks = useMemo(() => {
+    const m = {}
+    closeFriends.forEach((f, idx) => { m[f.num] = { ...f, rank: idx + 1 } })
+    return m
+  }, [closeFriends])
 
   const displayDraws = useMemo(
     () => displayCount === 'ALL' ? draws : draws.slice(-displayCount),
@@ -96,6 +140,17 @@ export default function MatrixPage() {
         </div>
       </div>
 
+      {selectedNumber && closeFriends.length > 0 && (
+        <div className="matrix-friend-bar">
+          <span className="mfb-title">#{selectedNumber} close friends</span>
+          {closeFriends.slice(0, 10).map((f, idx) => (
+            <button key={f.num} className={`mfb-chip ${idx < 3 ? 'hot' : ''}`} onClick={() => { setSelectedNumber(f.num); setSelectedCell(null); setPanelOpen(true) }} title={f.label}>
+              #{f.num}<small>{f.score.toFixed(0)}</small>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="matrix-body">
         <div className="grid-section">
           <CompassControl activeDir={activeDir} onToggle={handleDirToggle} selectedCell={selectedCell} selectedNumber={selectedNumber} />
@@ -109,6 +164,7 @@ export default function MatrixPage() {
               onCellClick={handleCellClick}
               onNumberClick={handleNumberClick}
               rowColors={rowColors}
+              friendshipRanks={friendshipRanks}
             />
           </div>
         </div>

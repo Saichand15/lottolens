@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { fetchAllDraws } from '../lib/supabase'
+import { computeHybridPrediction } from '../utils/hybridPrediction'
 import './BeamConsensus.css'
 
 // ── Beam directions ────────────────────────────────────────────────────────────
@@ -195,7 +196,7 @@ export default function BeamConsensus() {
   const [loading, setLoading] = useState(true)
   const [windowSize, setWindowSize] = useState(100)
   const [showAll, setShowAll] = useState(false)
-  const [activeSeq, setActiveSeq] = useState('mega') // 'mega' | 'cov5' | 'path' | 'direct'
+  const [activeSeq, setActiveSeq] = useState('hybrid') // 'hybrid' | 'mega' | 'cov5' | 'path' | 'direct'
   const [copiedTicket, setCopiedTicket] = useState(false)
   const [ticket, setTicket] = useState([])
 
@@ -211,6 +212,7 @@ export default function BeamConsensus() {
   }, [])
 
   const result = useMemo(() => runConsensus(draws, windowSize), [draws, windowSize])
+  const hybrid = useMemo(() => computeHybridPrediction(draws), [draws])
 
   const toggleTicket = n => {
     setTicket(prev =>
@@ -234,6 +236,17 @@ export default function BeamConsensus() {
 
   const { seeds, drawNum, ranked, seedData } = result
   const maxNum = result.total
+  const hybridRanked = (hybrid?.results || []).map((r, idx) => ({
+    n: r.number,
+    coverage: Math.min(5, Math.max(1, new Set((r.reasons || []).map(x => String(x).split('#')[0].split('@')[0].split(':')[0])).size)),
+    mathCount: r.reasons?.filter(x => String(x).startsWith('formula') || String(x).startsWith('beamMath')).length || 0,
+    pushCount: r.reasons?.filter(x => String(x).startsWith('mutual') || String(x).includes('rescue')).length || 0,
+    pathCov: r.laserDirect || 0,
+    directCount: r.directSeeds?.length || 0,
+    mega: Math.round(r.rawScore || r.score || 0),
+    seeds: r.directSeeds || [],
+    exprs: [`HYBRID #${idx + 1}`, ...(r.reasons || []).slice(0, 2)]
+  }))
 
   // Zone-balanced spread picker: pick best from each zone by coverage→mega
   // This prevents the "all low numbers" problem
@@ -263,6 +276,7 @@ export default function BeamConsensus() {
   const spreadD = balancedSpread([...ranked].sort((a,b) => b.pushCount - a.pushCount || b.coverage - a.coverage), zones5)
 
   const seqMap = {
+    hybrid: hybridRanked.slice(0, 5),
     mega:   spreadC.length === 5 ? spreadC : ranked.slice(0, 5),
     cov5:   spreadB.length === 5 ? spreadB : spreadA.length === 5 ? spreadA : in4plus.slice(0, 5),
     path:   spreadA.length === 5 ? spreadA : ranked.slice(0, 5),
@@ -318,6 +332,7 @@ export default function BeamConsensus() {
         <div className="bc-seq-title">🎯 PREDICTION SEQUENCES — pick one or combine</div>
         <div className="bc-seq-tabs">
           {[
+            { key: 'hybrid', label: '🧠 Hybrid Main', color: '#38bdf8' },
             { key: 'mega', label: '🏆 Mega Score', color: '#facc15' },
             { key: 'cov5', label: '🌐 5-Seed Cover', color: '#10b981' },
             { key: 'path', label: '📍 Path Strong', color: '#f59e0b' },

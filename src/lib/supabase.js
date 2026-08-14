@@ -5,44 +5,134 @@ const SUPABASE_KEY = 'sb_publishable_c7R-TNkov2Z4RnBbovdTRA_yAF955Ge'
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-// ─── DRAWS ────────────────────────────────────────────────────────────────────
+// Wrap any Supabase query with a hard timeout so the UI never hangs waiting
+// for a DNS/network failure. ms=3000 means pages load from local JSON in <100ms.
+async function sbQuery(queryFn, ms = 3000) {
+  return Promise.race([
+    queryFn(),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Supabase timeout')), ms)
+    )
+  ])
+}
+
+// ─── DRAWS (Lucky Day Lotto) ──────────────────────────────────────────────────
+// Strategy: load local all_draws.json first (always available + up-to-date),
+// then merge any Supabase rows, then merge localStorage manual entries.
+// This way the app works fully offline / when Supabase is unreachable.
+
+let _drawsCache = null
+const DRAWS_LOCAL_KEY = 'lotto_draws_manual_v1'
+
+function normalizeDrawRow(raw) {
+  const id = Number(raw?.id ?? raw?.draw_number)
+  if (!id || id < 1) return null
+  const numbers = Array.isArray(raw?.numbers)
+    ? raw.numbers.map(Number)
+    : [raw?.n1, raw?.n2, raw?.n3, raw?.n4, raw?.n5].map(Number)
+  if (numbers.length !== 5 || numbers.some(n => !n || n < 1 || n > 45)) return null
+  if (new Set(numbers).size !== 5) return null
+  return { id, numbers: [...numbers].sort((a, b) => a - b) }
+}
+
+function readLocalDraws() {
+  if (!canUseLocalStorage()) return []
+  try {
+    const raw = window.localStorage.getItem(DRAWS_LOCAL_KEY)
+    if (!raw) return []
+    const arr = JSON.parse(raw)
+    if (!Array.isArray(arr)) return []
+    return arr.map(normalizeDrawRow).filter(Boolean)
+  } catch { return [] }
+}
+
+function writeLocalDraws(draws) {
+  if (!canUseLocalStorage()) return
+  try { window.localStorage.setItem(DRAWS_LOCAL_KEY, JSON.stringify(draws)) } catch {}
+}
+
+function mergeDraws(...drawLists) {
+  const map = new Map()
+  drawLists.flat().forEach(d => {
+    const n = normalizeDrawRow(d)
+    if (n) map.set(n.id, n)
+  })
+  return [...map.values()].sort((a, b) => a.id - b.id)
+}
+
 export async function fetchAllDraws() {
-  const { data, error } = await supabase
-    .from('draws')
-    .select('draw_number,n1,n2,n3,n4,n5,draw_sum')
-    .order('draw_number', { ascending: true })
-  if (error) throw error
-  return data.map(r => ({
-    id: r.draw_number,
-    numbers: [r.n1, r.n2, r.n3, r.n4, r.n5]
-  }))
+  if (_drawsCache) return _drawsCache
+
+  // 1) Local JSON file (always bundled, always up-to-date)
+  let fileDraws = []
+  try {
+    const res = await fetch('/all_draws.json')
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data)) {
+        // all_draws.json is array-of-arrays: [[n1,n2,n3,n4,n5], ...]
+        fileDraws = data.map((nums, i) => ({ id: i + 1, numbers: [...nums].sort((a,b)=>a-b) }))
+      }
+    }
+  } catch {}
+
+  // 2) Supabase (best-effort — 3s timeout, fails gracefully if unreachable)
+  let supabaseDraws = []
+  try {
+    const { data, error } = await sbQuery(() =>
+      supabase.from('draws').select('draw_number,n1,n2,n3,n4,n5').order('draw_number', { ascending: true })
+    )
+    if (!error && Array.isArray(data)) {
+      supabaseDraws = data.map(r => ({
+        id: r.draw_number,
+        numbers: [r.n1, r.n2, r.n3, r.n4, r.n5]
+      }))
+    }
+  } catch {}
+
+  // 3) localStorage manual entries (survive page refresh)
+  const localDraws = readLocalDraws()
+
+  _drawsCache = mergeDraws(fileDraws, supabaseDraws, localDraws)
+  return _drawsCache
+}
+
+export function invalidateDrawsCache() {
+  _drawsCache = null
 }
 
 export async function fetchLatestDraw() {
-  const { data, error } = await supabase
-    .from('draws')
-    .select('draw_number,n1,n2,n3,n4,n5')
-    .order('draw_number', { ascending: false })
-    .limit(1)
-    .single()
-  if (error) throw error
-  return { id: data.draw_number, numbers: [data.n1, data.n2, data.n3, data.n4, data.n5] }
+  const all = await fetchAllDraws()
+  if (!all.length) throw new Error('No draws available')
+  return all[all.length - 1]
 }
 
 export async function insertDraw(drawNumber, numbers) {
-  const [n1, n2, n3, n4, n5] = numbers
-  const { error } = await supabase
-    .from('draws')
-    .upsert({ draw_number: drawNumber, n1, n2, n3, n4, n5 }, { onConflict: 'draw_number' })
-  if (error) throw error
+  const normalized = normalizeDrawRow({ id: drawNumber, numbers })
+  if (!normalized) throw new Error('Invalid draw payload.')
+
+  // Merge into cache + localStorage immediately so UI updates without reload
+  const current = _drawsCache || await fetchAllDraws()
+  _drawsCache = mergeDraws(current, [normalized])
+  writeLocalDraws(_drawsCache)
+
+  // Best-effort Supabase save (3s timeout)
+  const [n1, n2, n3, n4, n5] = normalized.numbers
+  let supabaseSaved = true
+  let supabaseError = null
+  try {
+    const { error } = await sbQuery(() =>
+      supabase.from('draws').upsert({ draw_number: normalized.id, n1, n2, n3, n4, n5 }, { onConflict: 'draw_number' })
+    )
+    if (error) { supabaseSaved = false; supabaseError = error.message }
+  } catch (e) { supabaseSaved = false; supabaseError = e.message }
+
+  return { supabaseSaved, supabaseError }
 }
 
 export async function fetchDrawCount() {
-  const { count, error } = await supabase
-    .from('draws')
-    .select('*', { count: 'exact', head: true })
-  if (error) throw error
-  return count
+  const all = await fetchAllDraws()
+  return all.length
 }
 
 // ─── POWERBALL DRAWS ──────────────────────────────────────────────────────────
@@ -130,13 +220,12 @@ export async function fetchAllPBDraws() {
     // continue with other sources
   }
 
-  // 2) Supabase rows (if table exists / policy allows)
+  // 2) Supabase rows (3s timeout — best-effort)
   let supabaseDraws = []
   try {
-    const { data, error } = await supabase
-      .from('pb_draws')
-      .select('draw_number,n1,n2,n3,n4,n5,pb,draw_date')
-      .order('draw_number', { ascending: true })
+    const { data, error } = await sbQuery(() =>
+      supabase.from('pb_draws').select('draw_number,n1,n2,n3,n4,n5,pb,draw_date').order('draw_number', { ascending: true })
+    )
     if (!error && Array.isArray(data)) {
       supabaseDraws = data.map(r => ({
         id: r.draw_number,
@@ -145,9 +234,7 @@ export async function fetchAllPBDraws() {
         date: r.draw_date
       }))
     }
-  } catch {
-    // continue with local cache only
-  }
+  } catch {}
 
   // 3) Browser local backup (manual entries survive refresh)
   const localDraws = readLocalPBDraws()
@@ -177,12 +264,12 @@ export async function insertPBDraw(drawNumber, numbers, pb, drawDate) {
   let supabaseSaved = true
   let supabaseError = null
   try {
-    const { error } = await supabase
-      .from('pb_draws')
-      .upsert(
+    const { error } = await sbQuery(() =>
+      supabase.from('pb_draws').upsert(
         { draw_number: normalized.id, n1, n2, n3, n4, n5, pb: normalized.pb, draw_date: normalized.date || null },
         { onConflict: 'draw_number' }
       )
+    )
     if (error) {
       supabaseSaved = false
       supabaseError = error.message
@@ -269,11 +356,9 @@ export async function fetchAllMMDraws() {
 
   let supabaseDraws = []
   try {
-    const { data, error } = await supabase
-      .from('mm_draws')
-      .select('draw_number,n1,n2,n3,n4,n5,mb,draw_date')
-      .order('draw_number', { ascending: true })
-
+    const { data, error } = await sbQuery(() =>
+      supabase.from('mm_draws').select('draw_number,n1,n2,n3,n4,n5,mb,draw_date').order('draw_number', { ascending: true })
+    )
     if (!error && Array.isArray(data)) {
       supabaseDraws = data.map(r => ({
         id: r.draw_number,
@@ -282,9 +367,7 @@ export async function fetchAllMMDraws() {
         date: r.draw_date
       }))
     }
-  } catch {
-    // continue with local cache only
-  }
+  } catch {}
 
   const localDraws = readLocalMMDraws()
   _mmDrawsCache = mergeMMDraws(fileDraws, supabaseDraws, localDraws)
@@ -312,12 +395,12 @@ export async function insertMMDraw(drawNumber, numbers, mb, drawDate) {
   let supabaseSaved = true
   let supabaseError = null
   try {
-    const { error } = await supabase
-      .from('mm_draws')
-      .upsert(
+    const { error } = await sbQuery(() =>
+      supabase.from('mm_draws').upsert(
         { draw_number: normalized.id, n1, n2, n3, n4, n5, mb: normalized.mb, draw_date: normalized.date || null },
         { onConflict: 'draw_number' }
       )
+    )
     if (error) {
       supabaseSaved = false
       supabaseError = error.message

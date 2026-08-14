@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { fetchAllDraws, insertDraw } from '../lib/supabase'
-import { postMortem, predictNextDraw } from '../utils/predictionEngine'
+import { fetchAllDraws, insertDraw, invalidateDrawsCache } from '../lib/supabase'
+import { postMortem } from '../utils/predictionEngine'
+import { computeHybridPrediction } from '../utils/hybridPrediction'
 import './AddResult.css'
 
 export default function AddResult() {
@@ -45,10 +46,14 @@ export default function AddResult() {
     setSaving(true)
     setError(null)
     try {
-      await insertDraw(nextId, nums)
+      const result = await insertDraw(nextId, nums)
+      if (!result.supabaseSaved) {
+        console.warn('Supabase save failed (offline?):', result.supabaseError)
+      }
       setSuccess(true)
       setNumbers(['', '', '', '', ''])
       setPreview(null)
+      invalidateDrawsCache()
       const updated = await fetchAllDraws()
       setDraws(updated)
     } catch (err) {
@@ -60,7 +65,7 @@ export default function AddResult() {
 
   if (loading) return <div className="page-loading"><div className="spinner"/><span>Loading…</span></div>
 
-  const prediction = latest ? predictNextDraw(draws, latest.numbers).slice(0, 5) : []
+  const prediction = latest ? (computeHybridPrediction(draws)?.results.slice(0, 5) || []) : []
 
   return (
     <div className="add-result-page">

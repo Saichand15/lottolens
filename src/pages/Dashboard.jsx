@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchAllDraws } from '../lib/supabase'
-import { predictNextDraw, buildGapMap, getHotCold, analyzeZones, buildFreqMap } from '../utils/predictionEngine'
+import { buildGapMap, getHotCold, analyzeZones, buildFreqMap } from '../utils/predictionEngine'
+import { computeHybridPrediction } from '../utils/hybridPrediction'
 import './Dashboard.css'
 
 export default function Dashboard() {
@@ -22,9 +23,9 @@ export default function Dashboard() {
 
   const latest = draws[draws.length - 1]
   const prev   = draws.length >= 2 ? draws[draws.length - 2] : null
-  const prediction = predictNextDraw(draws, latest.numbers)
-  const top5 = prediction.slice(0, 5)
-  const top20 = prediction.slice(0, 20)
+  const prediction = computeHybridPrediction(draws)
+  const top5 = prediction?.results.slice(0, 5) || []
+  const top20 = prediction?.results.slice(0, 20) || []
   const gaps = buildGapMap(draws)
   const { hot, cold } = getHotCold(draws, 30)
   const zones = analyzeZones(draws)

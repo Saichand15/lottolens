@@ -1,5 +1,6 @@
 ﻿import { useMemo, useState } from 'react'
 import { getSenders, getReceivers, getNumberAppearances } from '../utils/dataUtils'
+import { computeLaserReport } from '../utils/predictionEngine'
 import {
   getMatrixConfig, getDirs,
   nToPos, posToN, mirror,
@@ -175,6 +176,252 @@ function computeTouchMath(slice, ci, seed, maxNum) {
   return { ranked, beamNums, allNums: nums }
 }
 
+function addHybridScore(map, n, pts, reason, maxNum) {
+  if (n < 1 || n > maxNum || !Number.isFinite(pts)) return
+  if (!map[n]) map[n] = { pts: 0, exprs: [] }
+  map[n].pts += pts
+  if (reason && !map[n].exprs.includes(reason)) map[n].exprs.push(reason)
+}
+
+function wrapHybridNum(n, maxNum) {
+  if (!Number.isFinite(n)) return n
+  let v = Math.round(n)
+  while (v < 1) v += maxNum
+  while (v > maxNum) v -= maxNum
+  return v
+}
+
+function rankScoreMap(map) {
+  return Object.entries(map)
+    .map(([n, d]) => ({ n: +n, pts: d.pts, exprs: d.exprs || [] }))
+    .sort((a, b) => b.pts - a.pts || a.n - b.n)
+}
+
+function addRankedSignal(score, ranked, weight, label, maxNum, top = 25) {
+  ranked.slice(0, top).forEach((r, idx) => {
+    addHybridScore(score, r.n, (top - idx) * weight, `${label}#${idx + 1}`, maxNum)
+  })
+}
+
+function applyPlusMinusOneCorrection(score, maxNum) {
+  // Most misses in the backtest are not random misses; they are adjacent-row misses:
+  // predicted 12 → actual 11, predicted 31 → actual 32, etc.
+  // This layer keeps the original candidate, but also promotes n-1 / n+1 when the
+  // candidate has strong multi-engine support. That converts near-misses into exact
+  // candidates without destroying the original ranking.
+  const snapshot = rankScoreMap(score).slice(0, 30)
+  snapshot.forEach(({ n, pts, exprs }) => {
+    const engines = new Set((exprs || []).map(e => String(e).split('#')[0].split('@')[0].split(':')[0]))
+    const engineBonus = Math.min(engines.size, 5) * 1.8
+    const neighborWeight = Math.max(4, pts * 0.38 + engineBonus)
+
+    ;[-1, 1].forEach(delta => {
+      const adj = n + delta
+      if (adj < 1 || adj > maxNum) return
+      const alreadySupported = score[adj]?.pts || 0
+      const supportBoost = alreadySupported > 0 ? Math.min(10, alreadySupported * 0.18) : 0
+      addHybridScore(
+        score,
+        adj,
+        neighborWeight + supportBoost,
+        `±1-rescue ${n}${delta > 0 ? '+1' : '-1'}=${adj}`,
+        maxNum
+      )
+    })
+  })
+
+  // If both sides of a number are strong (n-1 and n+1), the middle number is often
+  // the true hit. Add a small bridge score to the middle of tight clusters.
+  for (let n = 2; n < maxNum; n++) {
+    const left = score[n - 1]?.pts || 0
+    const right = score[n + 1]?.pts || 0
+    if (left > 0 && right > 0) {
+      addHybridScore(score, n, Math.min(14, (left + right) * 0.08), `cluster-bridge ${n - 1}/${n + 1}`, maxNum)
+    }
+  }
+}
+
+function getHybridBeamHits(slice, ci, seed, maxNum) {
+  const hits = new Set()
+  for (const { dc, dr } of Object.values(BP_DIRS)) {
+    for (let step = 1; step <= slice.length; step++) {
+      const c2 = ci + dc * step
+      const n = seed + dr * step
+      if (c2 < 0 || c2 >= slice.length || n < 1 || n > maxNum) break
+      if (slice[c2].includes(n)) hits.add(n)
+    }
+  }
+  return [...hits]
+}
+
+function computeSeedBeamStats(history, seed, maxNum) {
+  const win = history.slice(-100)
+  const ci = win.length - 1
+  const sets = win.map(d => new Set(d))
+  const rowIdx = seed - 1
+  let nwSteps = 0, nwApp = 0, swSteps = 0, swApp = 0, neApp = 0, seApp = 0
+
+  for (const [dir, dc, dr] of [['NW', -1, -1], ['NE', 1, -1], ['SW', -1, 1], ['SE', 1, 1]]) {
+    let step = 1
+    while (true) {
+      const c = ci + dc * step
+      const r = rowIdx + dr * step
+      if (c < 0 || c >= win.length || r < 0 || r >= maxNum) break
+      const n = r + 1
+      const hit = sets[c]?.has(n) || false
+      if (dir === 'NW') { nwSteps++; if (hit) nwApp++ }
+      if (dir === 'SW') { swSteps++; if (hit) swApp++ }
+      if (dir === 'NE' && hit) neApp++
+      if (dir === 'SE' && hit) seApp++
+
+      const adjR = dr < 0 ? r - 1 : r + 1
+      if (adjR >= 0 && adjR < maxNum) {
+        const adjN = adjR + 1
+        const adjHit = sets[c]?.has(adjN) || false
+        if (dir === 'NW') { nwSteps++; if (adjHit) nwApp++ }
+        if (dir === 'SW') { swSteps++; if (adjHit) swApp++ }
+        if (dir === 'NE' && adjHit) neApp++
+        if (dir === 'SE' && adjHit) seApp++
+      }
+      step++
+    }
+  }
+  return { nwSteps, nwApp, swSteps, swApp, ct: nwApp + swApp + neApp + seApp }
+}
+
+function computeHybridBacktestPicks(draws, i, maxNum) {
+  const history = draws.slice(0, i + 1)
+  const seeds = draws[i]
+  const score = {}
+
+  // 1) Original beam arithmetic, but only as one vote in the ensemble.
+  try {
+    const bp = bpComputeBeamPicks(history, history.length - 1, seeds, maxNum)
+    addRankedSignal(score, bp.ranked, 0.8, 'beamMath', maxNum, 25)
+  } catch {
+    // keep other engines alive
+  }
+
+  // 2) Transition + same-draw friendship maps.
+  const trans = {}, transCount = {}, co = {}, lastSeen = {}, freq30 = {}
+  for (let n = 1; n <= maxNum; n++) { lastSeen[n] = -1; freq30[n] = 0 }
+  history.forEach((draw, di) => draw.forEach(n => { lastSeen[n] = di }))
+  history.slice(-30).forEach(draw => draw.forEach(n => { freq30[n] = (freq30[n] || 0) + 1 }))
+
+  for (let di = 0; di < history.length - 1; di++) {
+    history[di].forEach(from => {
+      transCount[from] = (transCount[from] || 0) + 1
+      if (!trans[from]) trans[from] = {}
+      history[di + 1].forEach(to => { trans[from][to] = (trans[from][to] || 0) + 1 })
+    })
+  }
+  history.forEach(draw => {
+    for (let a = 0; a < draw.length; a++) for (let b = a + 1; b < draw.length; b++) {
+      const x = draw[a], y = draw[b]
+      if (!co[x]) co[x] = {}
+      if (!co[y]) co[y] = {}
+      co[x][y] = (co[x][y] || 0) + 1
+      co[y][x] = (co[y][x] || 0) + 1
+    }
+  })
+
+  const transScore = {}, coScore = {}, gapScore = {}
+  seeds.forEach(seed => {
+    Object.entries(trans[seed] || {}).forEach(([to, c]) => {
+      addHybridScore(transScore, +to, (c / Math.max(transCount[seed] || 1, 1)) * 100, `T${seed}`, maxNum)
+    })
+  })
+  for (let n = 1; n <= maxNum; n++) {
+    const c = seeds.reduce((sum, seed) => sum + (co[seed]?.[n] || 0), 0)
+    addHybridScore(coScore, n, c, 'co', maxNum)
+    const gap = history.length - 1 - (lastSeen[n] ?? -1)
+    addHybridScore(gapScore, n, Math.max(0, gap - 5) * 2 + (freq30[n] === 0 ? 8 : 0) + (freq30[n] === 1 ? 3 : 0), `gap${gap}`, maxNum)
+  }
+  addRankedSignal(score, rankScoreMap(transScore), 1.0, 'trans', maxNum, 25)
+  addRankedSignal(score, rankScoreMap(coScore), 0.8, 'co', maxNum, 25)
+  addRankedSignal(score, rankScoreMap(gapScore), 0.65, 'gap', maxNum, 25)
+
+  // 3) NE/SE flow: this is what catches forming runs, but cannot be used alone.
+  const nese = {}
+  seeds.forEach(seed => {
+    ;[[seed - 1, 'NE1', 15], [seed + 1, 'SE1', 15], [seed - 2, 'NE2', 8], [seed + 2, 'SE2', 8]]
+      .forEach(([n, tag, w]) => addHybridScore(nese, n, w, `${tag}@${seed}`, maxNum))
+  })
+  for (let back = 1; back <= 3; back++) {
+    const past = history[history.length - 1 - back]
+    if (!past) continue
+    const k = back + 1
+    const w = back === 1 ? 10 : back === 2 ? 6 : 3
+    past.forEach(seed => {
+      addHybridScore(nese, seed - k, w, `NE-D${back}`, maxNum)
+      addHybridScore(nese, seed + k, w, `SE-D${back}`, maxNum)
+    })
+  }
+  addRankedSignal(score, rankScoreMap(nese), 1.15, 'nese', maxNum, 25)
+
+  // 4) Formula engine: fixes many ±1/±2 beam misses by adding corrected offsets.
+  const formulas = {}
+  seeds.forEach(seed => {
+    const s = computeSeedBeamStats(history, seed, maxNum)
+    const nwMiss = s.nwSteps - s.nwApp
+    const swMiss = s.swSteps - s.swApp
+    ;[
+      ['NW-S', s.nwSteps - seed, 12.4], ['NW-ct', s.nwSteps - s.ct, 14.4],
+      ['SW-ct', s.swSteps - s.ct, 14.1], ['SW+ct-1', s.swSteps + s.ct - 1, 14.3],
+      ['SW-nwA', s.swSteps - s.nwApp, 13.5], ['2SW-S+1', 2 * s.swSteps - seed + 1, 16.8],
+      ['S-ct+1', seed - s.ct + 1, 10.3], ['S+ct-1', seed + s.ct - 1, 12.9],
+      ['S-swA', seed - s.swApp, 12.1], ['S+nwA-1', seed + s.nwApp - 1, 12.3],
+      ['S-nwA', seed - s.nwApp, 11.6], ['S+swA', seed + s.swApp, 11.5],
+      ['NW%S', s.nwSteps % seed, 13.0], ['SW%S', s.swSteps % seed + 1, 12.7],
+      ['SW-NWmiss', s.swSteps - nwMiss, 15.2], ['NW-SWmiss', s.nwSteps - swMiss, 14.8],
+      ['S-SWmiss', seed - swMiss, 13.6], ['S+SWapp', seed + s.swApp, 13.0],
+      ['S+ct', seed + s.ct, 12.8], ['S-ct', seed - s.ct, 12.8], ['S-NW', seed - s.nwSteps, 12.6],
+      ['NWapp+ct', s.nwApp + s.ct, 12.5], ['S+NWapp', seed + s.nwApp, 12.3],
+      ['SW-SWapp', s.swSteps - s.swApp, 12.2], ['SWmiss', swMiss, 12.0],
+      ['SW+SWapp', s.swSteps + s.swApp, 12.0], ['SW+ct', s.swSteps + s.ct, 12.0],
+      ['SW-NWapp', s.swSteps - s.nwApp, 11.9], ['SW+SWmiss', s.swSteps + swMiss, 11.9],
+      ['ct-S', s.ct - seed, 11.9], ['NW+SWapp', s.nwSteps + s.swApp, 11.8], ['NW-SWapp', s.nwSteps - s.swApp, 11.8],
+      ['NW+NWmiss', s.nwSteps + nwMiss, 11.6], ['NWapp-ct', s.nwApp - s.ct, 11.4],
+      ['SWapp-SW', s.swApp - s.swSteps, 11.2], ['ct-NWapp', s.ct - s.nwApp, 11.0],
+      ['SWapp', s.swApp, 10.8]
+    ].forEach(([name, n, rate]) => {
+      addHybridScore(formulas, n, rate, `${name}@${seed}`, maxNum)
+      const wrapped = wrapHybridNum(n, maxNum)
+      if (wrapped !== n) addHybridScore(formulas, wrapped, rate * 0.82, `${name}↻@${seed}`, maxNum)
+    })
+  })
+  addRankedSignal(score, rankScoreMap(formulas), 1.25, 'formula', maxNum, 25)
+
+  // 5) Mutual beam frequency: strongest broad-history tiebreaker.
+  const freq = {}
+  for (let idx = 1; idx < history.length; idx++) {
+    const slice = history.slice(0, idx + 1)
+    const ci = slice.length - 1
+    history[idx].forEach(seed => {
+      if (!freq[seed]) freq[seed] = {}
+      getHybridBeamHits(slice, ci, seed, maxNum).forEach(h => { freq[seed][h] = (freq[seed][h] || 0) + 1 })
+    })
+  }
+  const mutual = {}
+  for (let n = 1; n <= maxNum; n++) {
+    let topM = 0, totalM = 0, seedCnt = 0
+    seeds.forEach(seed => {
+      const m = (freq[seed]?.[n] || 0) + (freq[n]?.[seed] || 0)
+      totalM += m
+      if (m > 0) seedCnt++
+      topM = Math.max(topM, m)
+    })
+    const coFreq = seeds.reduce((sum, seed) => sum + (co[n]?.[seed] || 0), 0)
+    const gap = history.length - 1 - (lastSeen[n] ?? -1)
+    addHybridScore(mutual, n, topM * 10 + seedCnt * 8 + totalM * 0.5 + coFreq * 1.2 + Math.max(0, gap - 8) * 0.5, `M${topM}/${seedCnt}/${totalM}`, maxNum)
+  }
+  addRankedSignal(score, rankScoreMap(mutual), 1.45, 'mutual', maxNum, 25)
+
+  applyPlusMinusOneCorrection(score, maxNum)
+
+  return { ranked: rankScoreMap(score), directHits: [] }
+}
+
 // ── Touch-Number Backtest ───────────────────────────────────────────────────
 function computeBacktest(draws, maxNum, lastN = 10) {
   if (!draws || draws.length < 3) return []
@@ -186,7 +433,7 @@ function computeBacktest(draws, maxNum, lastN = 10) {
     const draw = draws[i]
     let ranked = [], directHits = []
     try {
-      const bp = bpComputeBeamPicks(slice, ci, draw, maxNum)
+      const bp = computeHybridBacktestPicks(draws, i, maxNum)
       ranked = bp.ranked
       directHits = bp.directHits
     } catch { continue }
@@ -275,6 +522,12 @@ export default function FriendshipPanel({
     () => getNumberAppearances(draws || [], selectedNumber).slice(-12).reverse(),
     [draws, selectedNumber]
   )
+
+  // ── Laser Beam Frequency Report (historical: which numbers this # most often hits) ──
+  const laserFreqReport = useMemo(() => {
+    if (!draws?.length || !selectedNumber) return null
+    return computeLaserReport(draws, selectedNumber)
+  }, [draws, selectedNumber])
 
   // Cross-hits
   const crossHits = useMemo(() => {
@@ -673,7 +926,7 @@ export default function FriendshipPanel({
           desc: `${seed}−nwA(${nwApp})−2` },
         { group: 'S', name: 'S+nwA',      val: seed + nwApp,                   rate: 11.3, color: '#86efac',
           desc: `${seed}+nwA(${nwApp})` },
-        { group: 'S', name: 'S+swA',      val: seed + swApp,      val: seed + swApp,                   rate: 11.5, color: '#4ade80',
+        { group: 'S', name: 'S+swA',      val: seed + swApp,                   rate: 11.5, color: '#4ade80',
           desc: `${seed}+swA(${swApp})` },
       ].filter(f => f.val >= 1 && f.val <= maxN)
 
@@ -1094,6 +1347,15 @@ export default function FriendshipPanel({
             style={{ color: '#a78bfa', fontWeight: 700 }}
           >
              Future
+          </button>
+        )}
+        {laserFreqReport && (
+          <button
+            className={`fp-tab ${tab === 'beamfreq' ? 'active' : ''}`}
+            onClick={() => setTab('beamfreq')}
+            style={{ color: '#ff00ff', fontWeight: 700 }}
+          >
+            🎯 Beam Freq
           </button>
         )}
       </div>
@@ -2413,6 +2675,70 @@ export default function FriendshipPanel({
         )}
 
       </div>
+
+      {/*  BEAM FREQUENCY TAB  */}
+      {tab === 'beamfreq' && laserFreqReport && (() => {
+        const { results, totalAppearances } = laserFreqReport
+        const top = results.slice(0, 15)
+        const dirColors = { NE: '#00d4ff', NW: '#ff00ff', SE: '#ff6a00', SW: '#00ff88' }
+        const maxTotal = top[0]?.total || 1
+        return (
+          <div style={{ padding: '10px 12px' }}>
+            <div style={{ marginBottom: 10, color: '#94a3b8', fontSize: 12 }}>
+              <span style={{ color: '#ff00ff', fontWeight: 700 }}>#{selectedNumber}</span> appeared{' '}
+              <strong style={{ color: '#fbbf24' }}>{totalAppearances}</strong> times —
+              laser beam most frequently pointed to:
+            </div>
+            {top.map(r => {
+              const barPct = Math.round((r.total / maxTotal) * 100)
+              return (
+                <div key={r.number} style={{ marginBottom: 7 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    <span style={{
+                      background: '#1e2a3a', border: '1.5px solid #ff00ff',
+                      borderRadius: 6, padding: '1px 7px', fontWeight: 700,
+                      color: '#fff', fontSize: 13, minWidth: 30, textAlign: 'center'
+                    }}>
+                      {r.number}
+                    </span>
+                    <div style={{ flex: 1, background: '#0f172a', borderRadius: 4, height: 10, overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${barPct}%`, height: '100%',
+                        background: 'linear-gradient(90deg,#ff00ff,#00d4ff)',
+                        borderRadius: 4, transition: 'width 0.3s'
+                      }} />
+                    </div>
+                    <span style={{ color: '#fbbf24', fontSize: 12, minWidth: 28, textAlign: 'right' }}>
+                      {r.total}×
+                    </span>
+                    <span style={{ color: '#94a3b8', fontSize: 11, minWidth: 36, textAlign: 'right' }}>
+                      {r.hitRate}%
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, paddingLeft: 36 }}>
+                    {['NE','NW','SE','SW'].map(d => r[d] > 0 && (
+                      <span key={d} style={{
+                        background: dirColors[d] + '22', border: `1px solid ${dirColors[d]}`,
+                        borderRadius: 4, padding: '0 5px', fontSize: 10,
+                        color: dirColors[d], fontWeight: 600
+                      }}>
+                        {d} {r[d]}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+            <div style={{ marginTop: 12, padding: '8px 10px', background: '#0f172a', borderRadius: 8, fontSize: 11, color: '#64748b', lineHeight: 1.6 }}>
+              <strong style={{ color: '#ff00ff' }}>How to read:</strong> When #{selectedNumber} appeared in a draw,
+              its laser beams (NW/NE/SE/SW) fired diagonally — the first number each beam
+              landed on was counted. Numbers shown here are the most frequent first-hit targets.
+              High % = strong beam partnership.
+            </div>
+          </div>
+        )
+      })()}
+
     </div>
   )
 }

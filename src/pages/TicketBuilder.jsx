@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { fetchAllDraws } from '../lib/supabase'
 import {
-  analyzePosition, predictNextDraw, buildGapMap,
+  analyzePosition, buildGapMap,
   buildCoOccurrence, buildFreqMap, checkTripleCoOcc, getCoOcc
 } from '../utils/predictionEngine'
+import { computeHybridPrediction } from '../utils/hybridPrediction'
 import './TicketBuilder.css'
 
 const POSITIONS = ['Pos 1', 'Pos 2', 'Pos 3', 'Pos 4', 'Pos 5']
@@ -18,6 +19,13 @@ export default function TicketBuilder() {
     fetchAllDraws().then(setDraws).finally(() => setLoading(false))
   }, [])
 
+  const hybrid = useMemo(() => computeHybridPrediction(draws), [draws])
+  const hybridRank = useMemo(() => {
+    const rank = {}
+    ;(hybrid?.results || []).forEach((r, idx) => { rank[r.number] = { score: r.score, rank: idx + 1, tier: r.tier } })
+    return rank
+  }, [hybrid])
+
   if (loading) return <div className="page-loading"><div className="spinner"/><span>Loading…</span></div>
   if (!draws.length) return <div className="page-error">No draws in database.</div>
 
@@ -27,6 +35,18 @@ export default function TicketBuilder() {
 
   // Candidates for current active position
   const candidates = analyzePosition(draws, activePos, picked)
+    .map(c => {
+      const h = hybridRank[c.number]
+      const hybridScore = h ? (100 - Math.min(h.rank - 1, 40) * 2) : 0
+      return {
+        ...c,
+        hybridScore: h?.score || 0,
+        hybridRank: h?.rank || null,
+        hybridTier: h?.tier || 'cold',
+        score: Math.round(c.score + hybridScore * 1.2)
+      }
+    })
+    .sort((a, b) => b.score - a.score || (a.hybridRank || 99) - (b.hybridRank || 99))
     .slice(0, 20)
 
   // When a number is picked, register it and advance to next pos
@@ -67,7 +87,7 @@ export default function TicketBuilder() {
   return (
     <div className="ticket-builder">
       <h1 className="tb-title">🎟 Ticket Builder</h1>
-      <p className="tb-sub">Pick one number per position. Suggestions ranked by position frequency × co-occurrence × gap bonus.</p>
+      <p className="tb-sub">Pick one number per position. Suggestions now combine hybrid prediction rank + position frequency + co-occurrence + gap.</p>
 
       {/* Ticket display */}
       <div className="ticket-card">
@@ -149,7 +169,7 @@ export default function TicketBuilder() {
             {picked.length > 0 && <span className="locked-label"> (locked: {picked.join(', ')})</span>}
           </h2>
           <div className="candidates-grid">
-            {candidates.map(({ number, posFreq, coScore, gap, score }) => (
+            {candidates.map(({ number, posFreq, coScore, gap, score, hybridScore, hybridRank }) => (
               <button
                 key={number}
                 className={`cand-btn ${picked.includes(number) ? 'already-picked' : ''}`}
@@ -161,12 +181,13 @@ export default function TicketBuilder() {
                   <span className="cand-stat">P{posFreq}</span>
                   <span className="cand-stat">C{coScore}</span>
                   <span className="cand-stat">G{gap}</span>
+                  {hybridRank && <span className="cand-stat">H{hybridScore}</span>}
                 </div>
                 <span className="cand-score">{score}</span>
               </button>
             ))}
           </div>
-          <p className="cand-hint">P = position frequency · C = co-score with locked · G = gap</p>
+          <p className="cand-hint">H = unified hybrid score · P = position frequency · C = co-score with locked · G = gap</p>
         </div>
       )}
     </div>
