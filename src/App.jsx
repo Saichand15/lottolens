@@ -18,6 +18,9 @@ import PBHistory from './pages/powerball/PBHistory'
 import PBAddResult from './pages/powerball/PBAddResult'
 import PBMatrixPage from './pages/powerball/PBMatrixPage'
 import PBBallMatrixPage from './pages/powerball/PBBallMatrixPage'
+import PBBeamPredict from './pages/powerball/PBBeamPredict'
+import LottoBeamPredict from './pages/LottoBeamPredict'
+import MMBeamPredict from './pages/megamillions/MMBeamPredict'
 import MMDashboard from './pages/megamillions/MMDashboard'
 import MMPredict from './pages/megamillions/MMPredict'
 import MMHistory from './pages/megamillions/MMHistory'
@@ -45,17 +48,20 @@ export default function App() {
           <Route path="/lotto/analysis"  element={<Analysis />} />
           <Route path="/lotto/add"       element={<AddResult />} />
           <Route path="/lotto/inspector" element={<NumberInspector />} />
-          <Route path="/lotto/beam"      element={<BeamConsensus />} />
+          <Route path="/lotto/beam"         element={<BeamConsensus />} />
+          <Route path="/lotto/beam-predict"  element={<LottoBeamPredict />} />
           {/* Powerball routes */}
           <Route path="/powerball"          element={<PBDashboard />} />
-          <Route path="/powerball/predict"  element={<PBPredict />} />
+          <Route path="/powerball/predict"    element={<PBPredict />} />
+          <Route path="/powerball/beam-predict" element={<PBBeamPredict />} />
           <Route path="/powerball/matrix"   element={<PBMatrixPage />} />
           <Route path="/powerball/pb-matrix" element={<PBBallMatrixPage />} />
           <Route path="/powerball/history"  element={<PBHistory />} />
           <Route path="/powerball/add"      element={<PBAddResult />} />
           {/* Mega Millions routes */}
           <Route path="/megamillions"           element={<MMDashboard />} />
-          <Route path="/megamillions/predict"   element={<MMPredict />} />
+          <Route path="/megamillions/predict"      element={<MMPredict />} />
+          <Route path="/megamillions/beam-predict" element={<MMBeamPredict />} />
           <Route path="/megamillions/matrix"    element={<MMMatrixPage />} />
           <Route path="/megamillions/mb-matrix" element={<MMBallMatrixPage />} />
           <Route path="/megamillions/history"   element={<MMHistory />} />

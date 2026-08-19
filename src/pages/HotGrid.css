@@ -87,15 +87,36 @@
 .hg-stat span { color:#888; }
 
 .hg-laser-strip { background:#0c0c24;border:1px solid #2a2a40;border-radius:6px;padding:7px 10px;margin-bottom:8px;font-size:11px; }
-.hg-laser-title { font-size:10px;color:#f5a623;margin-bottom:5px; }
-.hg-laser-dir { display:flex;align-items:center;gap:6px;margin-bottom:3px; }
-.hg-dir-label { width:26px;font-size:10px;font-weight:700;border-radius:3px;padding:1px 3px;text-align:center; }
-.hg-dir-ne { background:#1a3a1a;color:#00ffff; }
-.hg-dir-se { background:#3a1a1a;color:#ff6600; }
-.hg-dir-nw { background:#1a1a3a;color:#ff00ff; }
-.hg-dir-sw { background:#2a2a1a;color:#00ff88; }
-.hg-laser-hits { display:flex;gap:4px;flex-wrap:wrap; }
-.hg-lhit { background:rgba(255,215,0,.2);border:1px solid rgba(255,215,0,.5);border-radius:3px;padding:0 4px;font-size:10px;color:#ffd700; }
+.hg-laser-title { font-size:10px;color:#f5a623;margin-bottom:6px;font-weight:600; }
+
+/* Per-direction beam block */
+.hg-beam-block { margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #1a1a30; }
+.hg-beam-block:last-child { border-bottom:none;margin-bottom:0; }
+.hg-beam-heading {
+  font-size:11px;font-weight:700;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;
+}
+.hg-beam-meta { font-size:9px;font-weight:400;opacity:.6;text-transform:none;letter-spacing:0; }
+.hg-beam-section-label { font-size:9px;color:#666;margin:3px 0 2px;text-transform:uppercase;letter-spacing:.4px; }
+
+.hg-beam-row {
+  display:flex;align-items:center;gap:6px;
+  padding:1px 4px;border-radius:3px;
+  font-family:'Courier New',monospace;font-size:10px;
+  margin-bottom:1px;
+}
+.hg-beam-onpath { background:rgba(255,215,0,.06); }
+.hg-beam-corner { background:rgba(255,255,255,.03); }
+
+.hg-beam-step { color:#555;min-width:42px; }
+.hg-beam-num  { font-weight:700;color:#e0e0f0;min-width:22px; }
+.hg-beam-draw { color:#888;min-width:38px; }
+.hg-beam-tag  { font-size:8px;color:#9b59b6;background:rgba(155,89,182,.15);border-radius:2px;padding:0 4px; }
+
+.hg-dir-ne { color:#00ffff; }
+.hg-dir-nw { color:#ff00ff; }
+.hg-dir-se { color:#ff6600; }
+.hg-dir-sw { color:#00ff88; }
+
 .hg-no-hit { color:#444; }
 
 .hg-follows-block { background:#111122;border-radius:6px;padding:7px 10px;margin-bottom:7px; }

@@ -319,15 +319,51 @@ export default function HotGrid() {
 
               {laserHits && selectedCell && (
                 <div className="hg-laser-strip">
-                  <div className="hg-laser-title">Laser from D{allDraws.length - draws.length + selectedCell.colIdx + 1} row {selectedCell.rowNum}</div>
-                  {['NE','SE','NW','SW'].map(dir => {
-                    const hits = laserHits.hits?.[dir] || []
-                    return activeDir[dir] && (
-                      <div key={dir} className="hg-laser-dir">
-                        <span className={`hg-dir-label hg-dir-${dir.toLowerCase()}`}>{dir}</span>
-                        <span className="hg-laser-hits">
-                          {hits.length ? hits.map(h => <span key={h.colIdx} className="hg-lhit">{h.number}</span>) : <span className="hg-no-hit">none</span>}
-                        </span>
+                  <div className="hg-laser-title">
+                    ⚡ Laser · D{allDraws.length - draws.length + selectedCell.colIdx + 1} · row {selectedCell.rowNum}
+                  </div>
+                  {['NE','NW','SE','SW'].map(dir => {
+                    if (!activeDir[dir]) return null
+                    const ct       = laserHits.cornerTouch?.[dir] || []
+                    const onPath   = ct.filter(x => x.appeared && !x.isCornerAdj)
+                    const cornered = ct.filter(x => x.appeared &&  x.isCornerAdj)
+                    const totalSteps = ct.filter(x => !x.isCornerAdj).length
+                    return (
+                      <div key={dir} className="hg-beam-block">
+                        <div className={`hg-beam-heading hg-dir-${dir.toLowerCase()}`}>
+                          {dir} beam &nbsp;<span className="hg-beam-meta">({totalSteps} steps · {onPath.length} on-path · {cornered.length} corner)</span>
+                        </div>
+
+                        {onPath.length > 0 && (
+                          <>
+                            <div className="hg-beam-section-label">On path:</div>
+                            {onPath.map((h, i) => (
+                              <div key={i} className="hg-beam-row hg-beam-onpath">
+                                <span className="hg-beam-step">step {h.step}</span>
+                                <span className="hg-beam-num">{h.number}</span>
+                                <span className="hg-beam-draw">D{allDraws.length - draws.length + h.colIdx + 1}</span>
+                              </div>
+                            ))}
+                          </>
+                        )}
+
+                        {cornered.length > 0 && (
+                          <>
+                            <div className="hg-beam-section-label">Corner-grazed:</div>
+                            {cornered.map((h, i) => (
+                              <div key={i} className="hg-beam-row hg-beam-corner">
+                                <span className="hg-beam-step">step {h.step}</span>
+                                <span className="hg-beam-num">{h.number}</span>
+                                <span className="hg-beam-draw">D{allDraws.length - draws.length + h.colIdx + 1}</span>
+                                <span className="hg-beam-tag">corner</span>
+                              </div>
+                            ))}
+                          </>
+                        )}
+
+                        {onPath.length === 0 && cornered.length === 0 && (
+                          <div className="hg-beam-row hg-no-hit">— no hits</div>
+                        )}
                       </div>
                     )
                   })}

@@ -43,6 +43,7 @@ export default function Navbar() {
             <NavLink to="/lotto/predict" className={({ isActive }) => isActive ? 'nav-link active nav-link-predict' : 'nav-link nav-link-predict'}>Predict</NavLink>
             <NavLink to="/lotto/matrix" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>Matrix</NavLink>
             <NavLink to="/lotto/hotgrid" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>🔥 Hot Grid</NavLink>
+            <NavLink to="/lotto/beam-predict" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>⚡ Beam</NavLink>
             <NavLink to="/lotto/ticket" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>Ticket</NavLink>
             <NavLink to="/lotto/history" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>History</NavLink>
             <NavLink to="/lotto/analysis" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>Analysis</NavLink>
@@ -55,6 +56,7 @@ export default function Navbar() {
           <>
             <NavLink to="/powerball" end className={({ isActive }) => isActive ? 'nav-link active nav-link-pb' : 'nav-link nav-link-pb'}>Dashboard</NavLink>
             <NavLink to="/powerball/predict" className={({ isActive }) => isActive ? 'nav-link active nav-link-pb' : 'nav-link nav-link-pb'}>🔮 Predict</NavLink>
+            <NavLink to="/powerball/beam-predict" className={({ isActive }) => isActive ? 'nav-link active nav-link-pb' : 'nav-link nav-link-pb'}>⚡ Beam</NavLink>
             <NavLink to="/powerball/matrix" className={({ isActive }) => isActive ? 'nav-link active nav-link-pb' : 'nav-link nav-link-pb'}>🗂 Matrix</NavLink>
             <NavLink to="/powerball/pb-matrix" className={({ isActive }) => isActive ? 'nav-link active nav-link-pb' : 'nav-link nav-link-pb'}>🔴 PB Matrix</NavLink>
             <NavLink to="/powerball/history" className={({ isActive }) => isActive ? 'nav-link active nav-link-pb' : 'nav-link nav-link-pb'}>History</NavLink>
@@ -65,6 +67,7 @@ export default function Navbar() {
           <>
             <NavLink to="/megamillions" end className={({ isActive }) => isActive ? 'nav-link active nav-link-mm' : 'nav-link nav-link-mm'}>Dashboard</NavLink>
             <NavLink to="/megamillions/predict" className={({ isActive }) => isActive ? 'nav-link active nav-link-mm' : 'nav-link nav-link-mm'}>🔮 Predict</NavLink>
+            <NavLink to="/megamillions/beam-predict" className={({ isActive }) => isActive ? 'nav-link active nav-link-mm' : 'nav-link nav-link-mm'}>⚡ Beam</NavLink>
             <NavLink to="/megamillions/matrix" className={({ isActive }) => isActive ? 'nav-link active nav-link-mm' : 'nav-link nav-link-mm'}>🗂 Matrix</NavLink>
             <NavLink to="/megamillions/mb-matrix" className={({ isActive }) => isActive ? 'nav-link active nav-link-mm' : 'nav-link nav-link-mm'}>🟡 MB Matrix</NavLink>
             <NavLink to="/megamillions/history" className={({ isActive }) => isActive ? 'nav-link active nav-link-mm' : 'nav-link nav-link-mm'}>History</NavLink>
