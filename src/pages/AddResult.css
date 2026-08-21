@@ -33,6 +33,11 @@
   color: #166534;
   font-size: 14px;
 }
+.success-banner.warn-local {
+  background: #fefce8;
+  border-color: #fbbf24;
+  color: #92400e;
+}
 .btn-dismiss { background: none; border: none; font-size: 18px; cursor: pointer; color: #166534; }
 
 .ar-form-card {

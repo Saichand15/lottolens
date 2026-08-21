@@ -10,7 +10,8 @@ export default function AddResult() {
   const [numbers, setNumbers] = useState(['', '', '', '', ''])
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
-  const [error, setError] = useState(null)
+  const [saveInfo, setSaveInfo] = useState(null)  // { local: true, cloud: bool }
+  const [error, setError]     = useState(null)
   const [preview, setPreview] = useState(null)
 
   useEffect(() => { fetchAllDraws().then(setDraws).finally(() => setLoading(false)) }, [])
@@ -47,9 +48,7 @@ export default function AddResult() {
     setError(null)
     try {
       const result = await insertDraw(nextId, nums)
-      if (!result.supabaseSaved) {
-        console.warn('Supabase save failed (offline?):', result.supabaseError)
-      }
+      setSaveInfo({ local: true, cloud: result.supabaseSaved })
       setSuccess(true)
       setNumbers(['', '', '', '', ''])
       setPreview(null)
@@ -86,9 +85,12 @@ export default function AddResult() {
         </div>
       )}
 
-      {success && (
-        <div className="success-banner">
-          ✅ D{nextId - 1} added successfully! Database updated.
+      {success && saveInfo && (
+        <div className={`success-banner ${saveInfo.cloud ? '' : 'warn-local'}`}>
+          {saveInfo.cloud
+            ? `✅ D${nextId - 1} saved to cloud database.`
+            : `✅ D${nextId - 1} saved locally (browser storage). Cloud/Supabase is unreachable — the result will persist in this browser but won't sync to other devices.`
+          }
           <button className="btn-dismiss" onClick={() => setSuccess(false)}>×</button>
         </div>
       )}
