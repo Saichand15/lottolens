@@ -133,23 +133,19 @@ export default function HotGrid() {
   const handleDirToggle = useCallback((dir) => setActiveDir(prev => ({ ...prev, [dir]: !prev[dir] })), [])
   const handleClose     = useCallback(() => { setSelectedNumber(null); setSelectedCell(null); setPanelOpen(false) }, [])
 
-  // ── Math tab: arithmetic combinations of beam step + hit numbers ──────────
+  // ── Math tab: arithmetic combinations of beam STEP numbers only ─────────────
   const mathCandidates = useMemo(() => {
     if (!laserHits || !selectedCell) return []
 
-    // Collect step numbers AND hit numbers from all active beams
-    const stepNums = new Set()
-    const hitNums  = new Set();
-    ['NE','NW','SE','SW'].forEach(dir => {
+    // Collect ONLY the step numbers (distances) where hits occurred — NOT the hit numbers
+    const stepSet = new Set()
+    ;['NE','NW','SE','SW'].forEach(dir => {
       if (!activeDir[dir]) return
       const ct = laserHits.cornerTouch?.[dir] || []
-      ct.filter(x => x.appeared).forEach(x => {
-        stepNums.add(x.step)
-        hitNums.add(x.number)
-      })
+      ct.filter(x => x.appeared).forEach(x => stepSet.add(x.step))
     })
-    const inputs = [...new Set([...stepNums, ...hitNums])].filter(v => v >= 1 && v <= MAXN).sort((a,b)=>a-b)
-    if (inputs.length < 2) return []
+    const steps = [...stepSet].sort((a, b) => a - b)
+    if (steps.length < 2) return []
 
     const scores = {}
     const reg = (val, expr) => {
@@ -158,41 +154,35 @@ export default function HotGrid() {
       scores[val].add(expr)
     }
 
-    // Singles
-    inputs.forEach(a => reg(a, `${a}`))
-
-    // Pairs
-    for (let i = 0; i < inputs.length; i++) {
-      for (let j = i + 1; j < inputs.length; j++) {
-        const a = inputs[i], b = inputs[j]
+    // Pairs: a+b, b-a, ±1 variants
+    for (let i = 0; i < steps.length; i++) {
+      for (let j = i + 1; j < steps.length; j++) {
+        const a = steps[i], b = steps[j]
         reg(a + b,     `${a}+${b}`)
         reg(a + b - 1, `${a}+${b}-1`)
         reg(a + b + 1, `${a}+${b}+1`)
         reg(b - a,     `${b}-${a}`)
         reg(b - a - 1, `${b}-${a}-1`)
         reg(b - a + 1, `${b}-${a}+1`)
-        reg(a - b + MAXN, `${a}-${b}+${MAXN}`)  // wraparound variant
       }
     }
 
-    // Triples
-    for (let i = 0; i < inputs.length; i++) {
-      for (let j = i + 1; j < inputs.length; j++) {
-        for (let k = j + 1; k < inputs.length; k++) {
-          const a = inputs[i], b = inputs[j], c = inputs[k]
-          ;[[a+b+c,'+'],[a+b+c-1,'+-1'],[a+b+c+1,'++1'],
-            [a+b-c,'-c'],[a+c-b,'-b'],[b+c-a,'-a'],
-            [a+b-c-1,'-c-1'],[a+b-c+1,'-c+1'],
-          ].forEach(([val, tag]) => {
-            if (tag==='+')   reg(val, `${a}+${b}+${c}`)
-            else if(tag==='+-1') reg(val, `${a}+${b}+${c}-1`)
-            else if(tag==='++1') reg(val, `${a}+${b}+${c}+1`)
-            else if(tag==='-c')  reg(val, `${a}+${b}-${c}`)
-            else if(tag==='-b')  reg(val, `${a}+${c}-${b}`)
-            else if(tag==='-a')  reg(val, `${b}+${c}-${a}`)
-            else if(tag==='-c-1') reg(val, `${a}+${b}-${c}-1`)
-            else if(tag==='-c+1') reg(val, `${a}+${b}-${c}+1`)
-          })
+    // Triples: all sign combinations ±1
+    for (let i = 0; i < steps.length; i++) {
+      for (let j = i + 1; j < steps.length; j++) {
+        for (let k = j + 1; k < steps.length; k++) {
+          const a = steps[i], b = steps[j], c = steps[k]
+          reg(a + b + c,     `${a}+${b}+${c}`)
+          reg(a + b + c - 1, `${a}+${b}+${c}-1`)
+          reg(a + b + c + 1, `${a}+${b}+${c}+1`)
+          reg(a + b - c,     `${a}+${b}-${c}`)
+          reg(a + b - c - 1, `${a}+${b}-${c}-1`)
+          reg(a + b - c + 1, `${a}+${b}-${c}+1`)
+          reg(a + c - b,     `${a}+${c}-${b}`)
+          reg(a + c - b - 1, `${a}+${c}-${b}-1`)
+          reg(b + c - a,     `${b}+${c}-${a}`)
+          reg(b + c - a - 1, `${b}+${c}-${a}-1`)
+          reg(b + c - a + 1, `${b}+${c}-${a}+1`)
         }
       }
     }
@@ -206,16 +196,16 @@ export default function HotGrid() {
       .slice(0, 25)
   }, [laserHits, activeDir, selectedCell])
 
-  // Gather raw inputs for display in Math tab
+  // Gather step numbers for display in Math tab
   const mathInputs = useMemo(() => {
-    if (!laserHits || !selectedCell) return { steps: [], hits: [] }
-    const steps = new Set(), hits = new Set();
-    ['NE','NW','SE','SW'].forEach(dir => {
+    if (!laserHits || !selectedCell) return []
+    const stepSet = new Set()
+    ;['NE','NW','SE','SW'].forEach(dir => {
       if (!activeDir[dir]) return
       const ct = laserHits.cornerTouch?.[dir] || []
-      ct.filter(x => x.appeared).forEach(x => { steps.add(x.step); hits.add(x.number) })
+      ct.filter(x => x.appeared).forEach(x => stepSet.add(x.step))
     })
-    return { steps: [...steps].sort((a,b)=>a-b), hits: [...hits].sort((a,b)=>a-b) }
+    return [...stepSet].sort((a, b) => a - b)
   }, [laserHits, activeDir, selectedCell])
 
   if (loading) return <div className="hg-loading"><div className="hg-spinner"/>Loading hot grid...</div>
@@ -488,15 +478,11 @@ export default function HotGrid() {
                     <div className="hg-tab-empty">No beam hits — try a different cell</div>
                   ) : (
                     <>
-                      {/* Input tags */}
+                      {/* Input step numbers */}
                       <div className="hg-math-inputs">
-                        <div className="hg-math-input-label">Steps used:</div>
+                        <div className="hg-math-input-label">Step numbers from beams:</div>
                         <div className="hg-math-tags">
-                          {mathInputs.steps.map(s => <span key={s} className="hg-math-tag hg-tag-step">{s}</span>)}
-                        </div>
-                        <div className="hg-math-input-label" style={{marginTop:4}}>Hit numbers:</div>
-                        <div className="hg-math-tags">
-                          {mathInputs.hits.map(h => <span key={h} className="hg-math-tag hg-tag-hit">{h}</span>)}
+                          {mathInputs.map(s => <span key={s} className="hg-math-tag hg-tag-step">{s}</span>)}
                         </div>
                       </div>
 
