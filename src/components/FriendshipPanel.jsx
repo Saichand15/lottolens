@@ -10,6 +10,67 @@ import {
 // ── Beam Picks helpers ─────────────────────────────────────────────────────
 const BP_DIRS = { NW:{dc:-1,dr:-1}, NE:{dc:+1,dr:-1}, SW:{dc:-1,dr:+1}, SE:{dc:+1,dr:+1} }
 
+// ── Step-based beam math (same logic as HotGrid Math tab) ────────────────────
+// Collects STEP DISTANCES (not hit numbers) where any beam hit occurred,
+// then computes pair/triple arithmetic to find candidate lottery numbers.
+function computeStepMath(slice, ci, seed, maxNum) {
+  const stepSet = new Set()
+  Object.entries(BP_DIRS).forEach(([, { dc, dr }]) => {
+    for (let step = 1; step <= slice.length * 2; step++) {
+      const c2 = ci + dc * step
+      const n  = seed + dr * step
+      if (c2 < 0 || c2 >= slice.length || n < 1 || n > maxNum) break
+      const hit    = slice[c2].includes(n)
+      const adjUp  = n - 1 >= 1      && slice[c2].includes(n - 1)
+      const adjDn  = n + 1 <= maxNum && slice[c2].includes(n + 1)
+      if (hit || adjUp || adjDn) stepSet.add(step)
+    }
+  })
+  const steps = [...stepSet].sort((a, b) => a - b)
+  if (steps.length < 2) return null
+
+  const map = {}
+  const reg = (val, expr) => {
+    if (val < 1 || val > maxNum) return
+    if (!map[val]) map[val] = new Set()
+    map[val].add(expr)
+  }
+  // Pairs
+  for (let i = 0; i < steps.length; i++) {
+    for (let j = i + 1; j < steps.length; j++) {
+      const a = steps[i], b = steps[j]
+      reg(a+b,     `${a}+${b}`)
+      reg(a+b-1,   `${a}+${b}-1`)
+      reg(a+b+1,   `${a}+${b}+1`)
+      reg(b-a,     `${b}-${a}`)
+      reg(b-a-1,   `${b}-${a}-1`)
+      reg(b-a+1,   `${b}-${a}+1`)
+    }
+  }
+  // Triples
+  for (let i = 0; i < steps.length; i++) {
+    for (let j = i+1; j < steps.length; j++) {
+      for (let k = j+1; k < steps.length; k++) {
+        const a = steps[i], b = steps[j], c = steps[k]
+        reg(a+b+c,   `${a}+${b}+${c}`)
+        reg(a+b+c-1, `${a}+${b}+${c}-1`)
+        reg(a+b+c+1, `${a}+${b}+${c}+1`)
+        reg(a+b-c,   `${a}+${b}-${c}`)
+        reg(a+b-c-1, `${a}+${b}-${c}-1`)
+        reg(a+b-c+1, `${a}+${b}-${c}+1`)
+        reg(a+c-b,   `${a}+${c}-${b}`)
+        reg(b+c-a,   `${b}+${c}-${a}`)
+        reg(b+c-a-1, `${b}+${c}-${a}-1`)
+        reg(b+c-a+1, `${b}+${c}-${a}+1`)
+      }
+    }
+  }
+  const ranked = Object.entries(map)
+    .map(([n, s]) => ({ n: +n, exprs: [...s], count: s.size }))
+    .sort((a, b) => b.count - a.count || a.n - b.n)
+  return { steps, ranked }
+}
+
 function bpGetTouches(slice, ci, seed, dir, maxNum) {
   const { dc, dr } = BP_DIRS[dir]
   const path = [], corner = []
@@ -665,6 +726,21 @@ export default function FriendshipPanel({
     return { ...math, nextDraw, globalIdx }
   }, [selectedCell, draws, displayDraws, maxNumber])
 
+  // ── Step Math: arithmetic on beam STEP DISTANCES (same logic as HotGrid) ─
+  const stepMathData = useMemo(() => {
+    if (!selectedCell || !draws?.length || !displayDraws?.length) return null
+    const ci = selectedCell.colIdx
+    const drawOffset = (draws.length || 0) - displayDraws.length
+    const globalIdx = drawOffset + ci
+    if (globalIdx < 0 || globalIdx >= draws.length) return null
+    const slice = draws.slice(Math.max(0, globalIdx - ci), globalIdx + 1)
+    if (slice.length < 2) return null
+    const result = computeStepMath(slice, slice.length - 1, selectedCell.rowNum, maxNumber)
+    if (!result) return null
+    const nextDraw = draws[globalIdx + 1] || null
+    return { ...result, nextDraw, globalIdx }
+  }, [selectedCell, draws, displayDraws, maxNumber])
+
   // ── D+1 / D+2 Combined Signal Prediction (last-column only) ──────────────
   const dualPredData = useMemo(() => {
     if (!draws?.length || draws.length < 5) return null
@@ -1286,6 +1362,15 @@ export default function FriendshipPanel({
             🔢 Math
           </button>
         )}
+        {stepMathData && (
+          <button
+            className={`fp-tab ${tab === 'stepmath' ? 'active' : ''}`}
+            onClick={() => setTab('stepmath')}
+            style={{ color: '#00ffcc', fontWeight: 700 }}
+          >
+            📐 Step Math
+          </button>
+        )}
         {beamPicksData && (
           <button
             className={`fp-tab ${tab === 'beam' ? 'active' : ''}`}
@@ -1513,6 +1598,73 @@ export default function FriendshipPanel({
                 )
               })}
             </>)}
+          </div>
+        )}
+
+        {/*  STEP MATH TAB  */}
+        {tab === 'stepmath' && stepMathData && (
+          <div className="touchmath-panel">
+            <div className="ch-explain" style={{ borderColor: '#00ffcc' }}>
+              <strong style={{ color: '#00ffcc' }}>📐 Step Math</strong> — #{selectedCell?.rowNum} D#{(stepMathData.globalIdx ?? 0) + 1}<br/>
+              <span style={{ color: '#aaa', fontSize: 10 }}>
+                Step distances where beam hits occurred → arithmetic combinations (a+b, b-a, a+b+c …) → candidate numbers.
+                {stepMathData.nextDraw ? ' 🟢 = appeared in next draw.' : ''}
+              </span>
+            </div>
+
+            {/* Step inputs */}
+            <div className="fp-sec">
+              <h4 className="fp-sec-title" style={{ color: '#00ffcc' }}>Step distances used ({stepMathData.steps.length})</h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
+                {stepMathData.steps.map(s => (
+                  <span key={s} style={{
+                    display: 'inline-block', padding: '2px 7px', borderRadius: 4,
+                    fontSize: 11, fontWeight: 700,
+                    background: 'rgba(0,255,204,0.1)', color: '#00ffcc',
+                    border: '1px solid rgba(0,255,204,0.35)', fontFamily: 'monospace'
+                  }}>{s}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Ranked results */}
+            <div className="fp-sec">
+              <h4 className="fp-sec-title" style={{ color: '#00ffcc' }}>
+                Predicted numbers — by derivation count
+                <span style={{ color: '#666', fontWeight: 400, fontSize: 9, marginLeft: 6 }}>({stepMathData.ranked.length} candidates)</span>
+              </h4>
+              {stepMathData.ranked.slice(0, 30).map(({ n, count, exprs }, idx) => {
+                const isNextHit = stepMathData.nextDraw?.includes(n)
+                const isPm1     = !isNextHit && stepMathData.nextDraw?.some(a => Math.abs(a - n) === 1)
+                const isTop     = idx < 5
+                return (
+                  <div key={n} className="future-row" style={{
+                    borderLeft: `3px solid ${isNextHit ? '#4ade80' : isPm1 ? '#facc15' : isTop ? '#00ffcc' : '#333'}`,
+                    paddingLeft: 6, marginBottom: 4, background: isNextHit ? 'rgba(74,222,128,0.06)' : 'transparent'
+                  }}>
+                    <span style={{ fontSize: 9, color: '#666', minWidth: 16 }}>#{idx+1}</span>
+                    <span className="future-num" style={{
+                      color: isNextHit ? '#4ade80' : isPm1 ? '#facc15' : isTop ? '#00ffcc' : '#ccc',
+                      minWidth: 28, fontWeight: 800, fontSize: 16
+                    }}>{n}</span>
+                    <div className="future-bar-bg" style={{ flex: 1 }}>
+                      <div className="future-bar" style={{
+                        width: `${Math.min(count * 8, 100)}%`,
+                        background: isNextHit ? '#4ade80' : '#00ffcc'
+                      }} />
+                    </div>
+                    <span className="future-score" style={{
+                      color: isNextHit ? '#4ade80' : isTop ? '#00ffcc' : '#666',
+                      minWidth: 20
+                    }}>{count}×</span>
+                    <div style={{ fontSize: 9, color: '#777', marginLeft: 5, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                      {exprs.slice(0, 3).map(e => `${e}=${n}`).join(' | ')}
+                    </div>
+                    {isNextHit && <span style={{ fontSize: 9, color: '#4ade80', marginLeft: 4, fontWeight: 700 }}>✓</span>}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
 
