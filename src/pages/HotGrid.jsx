@@ -84,6 +84,81 @@ function buildDigitPairCalculator(pairInput, maxNum = MAXN) {
   }
 }
 
+function calcDigitRecipesForPair(aRaw, bRaw) {
+  const aNum = Math.round(Number(aRaw))
+  const bNum = Math.round(Number(bRaw))
+  if (!Number.isFinite(aNum) || !Number.isFinite(bNum)) return []
+
+  const a = Math.min(aNum, bNum)
+  const b = Math.max(aNum, bNum)
+  const A = splitPairDigits(a)
+  const B = splitPairDigits(b)
+
+  return [
+    { label: `${a} + ${b}`, value: a + b },
+    { label: `${A.tens} + ${A.ones} + ${B.tens} + ${B.ones}`, value: A.tens + A.ones + B.tens + B.ones },
+    { label: `${b} - ${A.ones}`, value: b - A.ones },
+    { label: `${b} - ${a}`, value: b - a },
+    { label: `${b} + ${A.ones} + ${A.tens}`, value: b + A.ones + A.tens },
+    { label: `${a} + ${B.ones} + ${B.tens}`, value: a + B.ones + B.tens },
+    { label: `${b} + ${A.ones}`, value: b + A.ones },
+    { label: `${a} + ${B.ones}`, value: a + B.ones },
+    { label: `${B.ones} + ${A.ones} + ${A.tens}`, value: B.ones + A.ones + A.tens },
+  ].filter(r => Number.isFinite(r.value) && r.value >= 1)
+}
+
+function buildTouchDigitOverlap(laserHits, activeDir) {
+  if (!laserHits?.cornerTouch) return null
+
+  const touched = new Set()
+  ;['NE', 'NW', 'SE', 'SW'].forEach(dir => {
+    if (!activeDir?.[dir]) return
+    const ct = laserHits.cornerTouch?.[dir] || []
+    ct.filter(x => x.appeared).forEach(x => touched.add(x.number))
+  })
+
+  const nums = [...touched].sort((a, b) => a - b)
+  if (nums.length < 2) return { nums, common: [], ranked: [], pairCount: 0 }
+
+  const tally = {}
+  let pairCount = 0
+  for (let i = 0; i < nums.length; i++) {
+    for (let j = i + 1; j < nums.length; j++) {
+      pairCount++
+      const a = nums[i]
+      const b = nums[j]
+      const pairKey = `${a}-${b}`
+      const recipes = calcDigitRecipesForPair(a, b)
+
+      recipes.forEach(({ label, value }) => {
+        if (!tally[value]) tally[value] = { pairs: new Set(), total: 0, labels: [] }
+        tally[value].pairs.add(pairKey)
+        tally[value].total += 1
+        const tag = `${a},${b}: ${label}`
+        if (!tally[value].labels.includes(tag)) tally[value].labels.push(tag)
+      })
+    }
+  }
+
+  const ranked = Object.entries(tally)
+    .map(([n, info]) => ({
+      n: +n,
+      pairCount: info.pairs.size,
+      total: info.total,
+      pairs: [...info.pairs].sort(),
+      labels: info.labels,
+    }))
+    .sort((a, b) => b.pairCount - a.pairCount || b.total - a.total || a.n - b.n)
+
+  return {
+    nums,
+    pairCount,
+    ranked,
+    common: ranked.filter(r => r.pairCount >= 2),
+    strong: ranked.filter(r => r.pairCount >= 3),
+  }
+}
+
 function getDirStepProfile(laserData, dir) {
   const ct = laserData?.cornerTouch?.[dir] || []
   const onPath = ct.filter(x => x.appeared && !x.isCornerAdj)
@@ -493,6 +568,7 @@ export default function HotGrid() {
   }, [manualStepInput, currentStepProfiles, historyDir, historyOccurrences])
 
   const pairCalcData = useMemo(() => buildDigitPairCalculator(pairStepInput, MAXN), [pairStepInput])
+  const touchDigitData = useMemo(() => buildTouchDigitOverlap(laserHits, activeDir), [laserHits, activeDir])
 
   if (loading) return <div className="hg-loading"><div className="hg-spinner"/>Loading hot grid...</div>
 
@@ -705,53 +781,97 @@ export default function HotGrid() {
               {sideTab === 'touch' && (
                 <>
                   {laserHits && selectedCell ? (
-                    <div className="hg-laser-strip">
-                      <div className="hg-laser-title">
-                        ⚡ Laser · D{allDraws.length - draws.length + selectedCell.colIdx + 1} · row {selectedCell.rowNum}
-                      </div>
-                      {['NE','NW','SE','SW'].map(dir => {
-                        if (!activeDir[dir]) return null
-                        const ct       = laserHits.cornerTouch?.[dir] || []
-                        const onPath   = ct.filter(x => x.appeared && !x.isCornerAdj)
-                        const cornered = ct.filter(x => x.appeared &&  x.isCornerAdj)
-                        const totalSteps = ct.filter(x => !x.isCornerAdj).length
-                        return (
-                          <div key={dir} className="hg-beam-block">
-                            <div className={`hg-beam-heading hg-dir-${dir.toLowerCase()}`}>
-                              {dir} beam <span className="hg-beam-meta">({totalSteps} steps · {onPath.length} on-path · {cornered.length} corner)</span>
+                    <>
+                      <div className="hg-laser-strip">
+                        <div className="hg-laser-title">
+                          ⚡ Laser · D{allDraws.length - draws.length + selectedCell.colIdx + 1} · row {selectedCell.rowNum}
+                        </div>
+                        {['NE','NW','SE','SW'].map(dir => {
+                          if (!activeDir[dir]) return null
+                          const ct       = laserHits.cornerTouch?.[dir] || []
+                          const onPath   = ct.filter(x => x.appeared && !x.isCornerAdj)
+                          const cornered = ct.filter(x => x.appeared &&  x.isCornerAdj)
+                          const totalSteps = ct.filter(x => !x.isCornerAdj).length
+                          return (
+                            <div key={dir} className="hg-beam-block">
+                              <div className={`hg-beam-heading hg-dir-${dir.toLowerCase()}`}>
+                                {dir} beam <span className="hg-beam-meta">({totalSteps} steps · {onPath.length} on-path · {cornered.length} corner)</span>
+                              </div>
+                              {onPath.length > 0 && (
+                                <>
+                                  <div className="hg-beam-section-label">On path:</div>
+                                  {onPath.map((h, i) => (
+                                    <div key={i} className="hg-beam-row hg-beam-onpath">
+                                      <span className="hg-beam-step">step {h.step}</span>
+                                      <span className="hg-beam-num">{h.number}</span>
+                                      <span className="hg-beam-draw">D{allDraws.length - draws.length + h.colIdx + 1}</span>
+                                    </div>
+                                  ))}
+                                </>
+                              )}
+                              {cornered.length > 0 && (
+                                <>
+                                  <div className="hg-beam-section-label">Corner-grazed:</div>
+                                  {cornered.map((h, i) => (
+                                    <div key={i} className="hg-beam-row hg-beam-corner">
+                                      <span className="hg-beam-step">step {h.step}</span>
+                                      <span className="hg-beam-num">{h.number}</span>
+                                      <span className="hg-beam-draw">D{allDraws.length - draws.length + h.colIdx + 1}</span>
+                                      <span className="hg-beam-tag">corner</span>
+                                    </div>
+                                  ))}
+                                </>
+                              )}
+                              {onPath.length === 0 && cornered.length === 0 && (
+                                <div className="hg-beam-row hg-no-hit">— no hits</div>
+                              )}
                             </div>
-                            {onPath.length > 0 && (
-                              <>
-                                <div className="hg-beam-section-label">On path:</div>
-                                {onPath.map((h, i) => (
-                                  <div key={i} className="hg-beam-row hg-beam-onpath">
-                                    <span className="hg-beam-step">step {h.step}</span>
-                                    <span className="hg-beam-num">{h.number}</span>
-                                    <span className="hg-beam-draw">D{allDraws.length - draws.length + h.colIdx + 1}</span>
-                                  </div>
-                                ))}
-                              </>
-                            )}
-                            {cornered.length > 0 && (
-                              <>
-                                <div className="hg-beam-section-label">Corner-grazed:</div>
-                                {cornered.map((h, i) => (
-                                  <div key={i} className="hg-beam-row hg-beam-corner">
-                                    <span className="hg-beam-step">step {h.step}</span>
-                                    <span className="hg-beam-num">{h.number}</span>
-                                    <span className="hg-beam-draw">D{allDraws.length - draws.length + h.colIdx + 1}</span>
-                                    <span className="hg-beam-tag">corner</span>
-                                  </div>
-                                ))}
-                              </>
-                            )}
-                            {onPath.length === 0 && cornered.length === 0 && (
-                              <div className="hg-beam-row hg-no-hit">— no hits</div>
-                            )}
+                          )
+                        })}
+                      </div>
+
+                      {touchDigitData && (
+                        <div className="hg-history-card">
+                          <div className="hg-history-card-title">Digit overlap from touched values</div>
+                          <div className="hg-history-note">
+                            Uses the visible hit values from active beams, runs digit formulas across all pairs, and ranks results repeated by multiple pairs.
                           </div>
-                        )
-                      })}
-                    </div>
+
+                          <div className="hg-math-tags" style={{ marginTop: 6 }}>
+                            {(touchDigitData.nums || []).map(n => (
+                              <span key={`touch-num-${n}`} className="hg-math-tag hg-tag-hit">{n}</span>
+                            ))}
+                          </div>
+
+                          {touchDigitData.common.length > 0 ? (
+                            <>
+                              <div className="hg-pair-grid" style={{ marginTop: 8 }}>
+                                {touchDigitData.common.slice(0, 10).map(({ n, pairCount, total }) => (
+                                  <div key={`touch-common-${n}`} className="hg-pair-card">
+                                    <div className="hg-pair-card-head">
+                                      <span className="hg-pair-value">{n}</span>
+                                      <span className="hg-pair-index">{pairCount} pairs</span>
+                                    </div>
+                                    <div className="hg-pair-card-total">{total} formula hits</div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                {touchDigitData.common.slice(0, 6).map(({ n, labels }) => (
+                                  <div key={`touch-label-${n}`} className="hg-history-example-row">
+                                    <span className="hg-history-example-id">{n}</span>
+                                    <span className="hg-history-example-next">{labels.slice(0, 2).join(' | ')}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="hg-tab-empty">Need at least two touched values with repeated outputs.</div>
+                          )}
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="hg-tab-empty">Click a gold cell to fire laser beams</div>
                   )}
