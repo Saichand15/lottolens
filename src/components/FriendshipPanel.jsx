@@ -258,6 +258,140 @@ function rankScoreMap(map) {
     .sort((a, b) => b.pts - a.pts || a.n - b.n)
 }
 
+function buildCommonStepMath(draws, displayDraws, selectedCell, maxNumber) {
+  if (!draws?.length) return null
+
+  const drawOffset = (draws?.length || 0) - (displayDraws?.length || 0)
+  const globalIdx = drawOffset + (selectedCell?.colIdx ?? (displayDraws?.length || 1) - 1)
+  const seedDraw = draws[globalIdx] || []
+  if (!seedDraw.length) return null
+
+  const seedProfiles = seedDraw.map(seed => {
+    const ci = selectedCell?.colIdx ?? (displayDraws?.length || 1) - 1
+    const slice = draws.slice(Math.max(0, globalIdx - ci), globalIdx + 1)
+    const localCi = slice.length - 1
+    const math = computeStepMath(slice, localCi, seed, maxNumber)
+    return { seed, math }
+  }).filter(x => x.math)
+
+  if (!seedProfiles.length) return null
+
+  const counts = {}
+  const reasons = {}
+  seedProfiles.forEach(({ seed, math }) => {
+    math.ranked.forEach(({ n, exprs }) => {
+      if (!counts[n]) counts[n] = { seeds: new Set(), total: 0 }
+      counts[n].seeds.add(seed)
+      counts[n].total += 1
+      if (!reasons[n]) reasons[n] = []
+      exprs.slice(0, 3).forEach(expr => {
+        const label = `${seed}:${expr}`
+        if (!reasons[n].includes(label)) reasons[n].push(label)
+      })
+    })
+  })
+
+  const ranked = Object.entries(counts)
+    .map(([n, info]) => ({
+      n: +n,
+      seedCount: info.seeds.size,
+      total: info.total,
+      seeds: [...info.seeds].sort((a, b) => a - b),
+      exprs: reasons[+n] || []
+    }))
+    .sort((a, b) => b.seedCount - a.seedCount || b.total - a.total || a.n - b.n)
+
+  const common = ranked.filter(r => r.seedCount >= 2)
+  const strong = ranked.filter(r => r.seedCount >= Math.max(3, Math.ceil(seedDraw.length * 0.6)))
+
+  return { seedDraw, seedProfiles, ranked, common, strong, globalIdx }
+}
+
+function splitPairDigits(n) {
+  const text = String(Math.abs(Math.round(Number(n) || 0))).padStart(2, '0')
+  return {
+    tens: +text[0],
+    ones: +text[text.length - 1],
+    digits: text.split('').map(Number)
+  }
+}
+
+function calcPairRecipes(aRaw, bRaw, maxNumber) {
+  const a = Math.round(Number(aRaw))
+  const b = Math.round(Number(bRaw))
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return []
+
+  const hi = Math.max(a, b)
+  const lo = Math.min(a, b)
+  const A = splitPairDigits(a)
+  const B = splitPairDigits(b)
+
+  const recipes = [
+    { label: `${a} + ${b}`, value: a + b },
+    { label: `${A.tens} + ${A.ones} + ${B.tens} + ${B.ones}`, value: A.tens + A.ones + B.tens + B.ones },
+    { label: `${b} - ${A.ones}`, value: b - A.ones },
+    { label: `${b} - ${a}`, value: b - a },
+    { label: `${b} + ${A.ones} + ${A.tens}`, value: b + A.ones + A.tens },
+    { label: `${a} + ${B.ones} + ${B.tens}`, value: a + B.ones + B.tens },
+    { label: `${b} + ${A.ones}`, value: b + A.ones },
+    { label: `${a} + ${B.ones}`, value: a + B.ones },
+    { label: `${B.ones} + ${A.ones} + ${A.tens}`, value: B.ones + A.ones + A.tens },
+    { label: `${hi} - ${lo}`, value: hi - lo },
+    { label: `${hi} + ${lo}`, value: hi + lo },
+  ]
+
+  return recipes
+    .filter(r => Number.isFinite(r.value) && r.value >= 1 && r.value <= maxNumber)
+    .map((r, idx) => ({
+      id: idx,
+      label: r.label,
+      value: r.value,
+      digits: splitPairDigits(r.value),
+    }))
+}
+
+function buildCommonPairCalc(currentDraw, maxNumber) {
+  if (!currentDraw?.length) return null
+  const pairs = []
+  for (let i = 0; i < currentDraw.length; i++) {
+    for (let j = i + 1; j < currentDraw.length; j++) {
+      const a = currentDraw[i]
+      const b = currentDraw[j]
+      const recipes = calcPairRecipes(a, b, maxNumber)
+      pairs.push({ a, b, recipes })
+    }
+  }
+
+  const tally = {}
+  pairs.forEach(({ a, b, recipes }) => {
+    recipes.forEach(({ value, label }) => {
+      if (!tally[value]) tally[value] = { pairs: new Set(), labels: [] }
+      tally[value].pairs.add(`${Math.min(a, b)}-${Math.max(a, b)}`)
+      const tag = `${a},${b}: ${label}`
+      if (!tally[value].labels.includes(tag)) tally[value].labels.push(tag)
+    })
+  })
+
+  const ranked = Object.entries(tally)
+    .map(([n, info]) => ({
+      n: +n,
+      pairCount: info.pairs.size,
+      total: info.labels.length,
+      pairs: [...info.pairs].sort(),
+      labels: info.labels,
+    }))
+    .sort((a, b) => b.pairCount - a.pairCount || b.total - a.total || a.n - b.n)
+
+  return {
+    currentDraw,
+    pairCount: pairs.length,
+    ranked,
+    common: ranked.filter(r => r.pairCount >= 2),
+    strong: ranked.filter(r => r.pairCount >= 3),
+    topPairs: pairs,
+  }
+}
+
 function addRankedSignal(score, ranked, weight, label, maxNum, top = 25) {
   ranked.slice(0, top).forEach((r, idx) => {
     addHybridScore(score, r.n, (top - idx) * weight, `${label}#${idx + 1}`, maxNum)
@@ -739,6 +873,25 @@ export default function FriendshipPanel({
     if (!result) return null
     const nextDraw = draws[globalIdx + 1] || null
     return { ...result, nextDraw, globalIdx }
+  }, [selectedCell, draws, displayDraws, maxNumber])
+
+  const commonPairCalcData = useMemo(() => {
+    if (!selectedCell || !draws?.length || !displayDraws?.length) return null
+    const drawOffset = (draws?.length || 0) - (displayDraws?.length || 0)
+    const globalIdx = drawOffset + (selectedCell?.colIdx ?? (displayDraws?.length || 1) - 1)
+    const currentDraw = draws[globalIdx] || []
+    const result = buildCommonPairCalc(currentDraw, maxNumber)
+    if (!result) return null
+    const nextDraw = draws[globalIdx + 1] || null
+    return { ...result, nextDraw, globalIdx }
+  }, [selectedCell, draws, displayDraws, maxNumber])
+
+  const commonStepMathData = useMemo(() => {
+    if (!selectedCell || !draws?.length || !displayDraws?.length) return null
+    const result = buildCommonStepMath(draws, displayDraws, selectedCell, maxNumber)
+    if (!result) return null
+    const nextDraw = draws[result.globalIdx + 1] || null
+    return { ...result, nextDraw }
   }, [selectedCell, draws, displayDraws, maxNumber])
 
   // ── D+1 / D+2 Combined Signal Prediction (last-column only) ──────────────
@@ -1371,6 +1524,24 @@ export default function FriendshipPanel({
             📐 Step Math
           </button>
         )}
+        {commonPairCalcData && (
+          <button
+            className={`fp-tab ${tab === 'commonpair' ? 'active' : ''}`}
+            onClick={() => setTab('commonpair')}
+            style={{ color: '#f97316', fontWeight: 700 }}
+          >
+            🧮 Pair Recipes
+          </button>
+        )}
+        {commonStepMathData && (
+          <button
+            className={`fp-tab ${tab === 'commonstep' ? 'active' : ''}`}
+            onClick={() => setTab('commonstep')}
+            style={{ color: '#60a5fa', fontWeight: 700 }}
+          >
+            🧩 Step Overlap
+          </button>
+        )}
         {beamPicksData && (
           <button
             className={`fp-tab ${tab === 'beam' ? 'active' : ''}`}
@@ -1665,6 +1836,142 @@ export default function FriendshipPanel({
                 )
               })}
             </div>
+          </div>
+        )}
+
+        {/*  COMMON PAIR TAB  */}
+        {tab === 'commonpair' && commonPairCalcData && (
+          <div className="touchmath-panel">
+            <div className="ch-explain" style={{ borderColor: '#f97316' }}>
+              <strong style={{ color: '#f97316' }}>🧮 Common Pair Results</strong> — current draw D#{(commonPairCalcData.globalIdx ?? 0) + 1}<br/>
+              <span style={{ color: '#aaa', fontSize: 10 }}>
+                Takes all 5 numbers in the current draw, runs the pair recipes on every pair, then shows only the results that repeat across multiple pairs.
+              </span>
+            </div>
+
+            <div className="fp-sec">
+              <h4 className="fp-sec-title" style={{ color: '#f97316' }}>Current draw numbers</h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                {commonPairCalcData.currentDraw.map(seed => (
+                  <span key={seed} style={{
+                    display: 'inline-block', padding: '2px 7px', borderRadius: 4,
+                    background: '#1e1208', border: '1px solid #7c2d12',
+                    color: '#fdba74', fontSize: 11, fontWeight: 700
+                  }}>
+                    {seed}
+                  </span>
+                ))}
+              </div>
+              <div style={{ fontSize: 10, color: '#8a8a8a' }}>Pairs checked: {commonPairCalcData.pairCount}</div>
+            </div>
+
+            <div className="fp-sec">
+              <h4 className="fp-sec-title" style={{ color: '#f97316' }}>Results repeated across multiple pairs</h4>
+              {commonPairCalcData.common.length > 0 ? (
+                <div className="touchmath-results">
+                  {commonPairCalcData.common.slice(0, 20).map(({ n, pairCount, total, pairs, labels }) => {
+                    const isNext = commonPairCalcData.nextDraw?.includes(n)
+                    return (
+                      <div key={n} className={`touchmath-row ${isNext ? 'touchmath-row-hit' : ''}`}>
+                        <span className="touchmath-rank">#{pairCount}p</span>
+                        <span className="touchmath-num">{n}</span>
+                        <div className="touchmath-exprs" style={{ flex: 1 }}>
+                          <span className="touchmath-expr">pairs: {pairs.join(', ')}</span>
+                          {labels.slice(0, 3).map((e, i) => (
+                            <span key={i} className="touchmath-expr">{e}</span>
+                          ))}
+                          {labels.length > 3 && <span className="touchmath-more">+{labels.length - 3} more</span>}
+                        </div>
+                        <span className="touchmath-score">{total}×</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="hg-tab-empty">No pair-calculation result repeats across multiple pairs in this draw.</div>
+              )}
+              {commonPairCalcData.strong.length > 0 && (
+                <div style={{ marginTop: 8, fontSize: 10, color: '#9ca3af' }}>
+                  Strong pair overlap: {commonPairCalcData.strong.map(r => r.n).slice(0, 12).join(', ')}
+                </div>
+              )}
+            </div>
+
+            {commonPairCalcData.nextDraw && (
+              <div className="fp-sec">
+                <h4 className="fp-sec-title" style={{ color: '#4ade80' }}>Next draw reference</h4>
+                <div style={{ fontSize: 10, color: '#888' }}>D#{(commonPairCalcData.globalIdx ?? 0) + 2}: {commonPairCalcData.nextDraw.join(', ')}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/*  COMMON TOUCH TAB  */}
+        {tab === 'commonstep' && commonStepMathData && (
+          <div className="touchmath-panel">
+            <div className="ch-explain" style={{ borderColor: '#60a5fa' }}>
+              <strong style={{ color: '#60a5fa' }}>🧩 Step Overlap Results</strong> — current draw D#{(commonStepMathData.globalIdx ?? 0) + 1}<br/>
+              <span style={{ color: '#aaa', fontSize: 10 }}>
+                Runs step-math for all 5 current draw numbers, then shows output values that repeat across seeds. Example: if result 15 appears from seeds 3 and 12, it is ranked as a strong overlap.
+              </span>
+            </div>
+
+            <div className="fp-sec">
+              <h4 className="fp-sec-title" style={{ color: '#60a5fa' }}>Current draw seeds</h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                {commonStepMathData.seedDraw.map(seed => (
+                  <span key={seed} style={{
+                    display: 'inline-block', padding: '2px 7px', borderRadius: 4,
+                    background: '#101a33', border: '1px solid #2b4c7e',
+                    color: '#bfdbfe', fontSize: 11, fontWeight: 700
+                  }}>
+                    {seed}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="fp-sec">
+              <h4 className="fp-sec-title" style={{ color: '#60a5fa' }}>Result values repeated by multiple seeds</h4>
+              {commonStepMathData.common.length > 0 ? (
+                <>
+                  <div className="touchmath-results">
+                    {commonStepMathData.common.slice(0, 20).map(({ n, seedCount, total, seeds, exprs }) => {
+                      const isNext = commonStepMathData.nextDraw?.includes(n)
+                      return (
+                        <div key={n} className={`touchmath-row ${isNext ? 'touchmath-row-hit' : ''}`}>
+                          <span className="touchmath-rank">{seedCount}/5</span>
+                          <span className="touchmath-num">{n}</span>
+                          <div className="touchmath-exprs" style={{ flex: 1 }}>
+                            <span className="touchmath-expr">seeds</span>
+                            {seeds.map(s => <span key={s} className="touchmath-expr">{s}</span>)}
+                            {exprs.slice(0, 3).map((e, i) => (
+                              <span key={i} className="touchmath-expr">{e}</span>
+                            ))}
+                            {exprs.length > 3 && <span className="touchmath-more">+{exprs.length - 3} more</span>}
+                          </div>
+                          <span className="touchmath-score">{total}×</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {commonStepMathData.strong.length > 0 && (
+                    <div style={{ marginTop: 8, fontSize: 10, color: '#9ca3af' }}>
+                      Strong overlap (2+ seeds): {commonStepMathData.strong.map(r => `${r.n}[${r.seedCount}]`).slice(0, 12).join(', ')}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="hg-tab-empty">No step result repeats across 2 or more of the current draw numbers.</div>
+              )}
+            </div>
+
+            {commonStepMathData.nextDraw && (
+              <div className="fp-sec">
+                <h4 className="fp-sec-title" style={{ color: '#4ade80' }}>Next draw reference</h4>
+                <div style={{ fontSize: 10, color: '#888' }}>D#{(commonStepMathData.globalIdx ?? 0) + 2}: {commonStepMathData.nextDraw.join(', ')}</div>
+              </div>
+            )}
           </div>
         )}
 
