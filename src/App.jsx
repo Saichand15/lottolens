@@ -19,6 +19,7 @@ import PBAddResult from './pages/powerball/PBAddResult'
 import PBMatrixPage from './pages/powerball/PBMatrixPage'
 import PBBallMatrixPage from './pages/powerball/PBBallMatrixPage'
 import PBBeamPredict from './pages/powerball/PBBeamPredict'
+import PBHotGrid from './pages/powerball/PBHotGrid'
 import LottoBeamPredict from './pages/LottoBeamPredict'
 import MMBeamPredict from './pages/megamillions/MMBeamPredict'
 import MMDashboard from './pages/megamillions/MMDashboard'
@@ -27,6 +28,7 @@ import MMHistory from './pages/megamillions/MMHistory'
 import MMAddResult from './pages/megamillions/MMAddResult'
 import MMMatrixPage from './pages/megamillions/MMMatrixPage'
 import MMBallMatrixPage from './pages/megamillions/MMBallMatrixPage'
+import MMHotGrid from './pages/megamillions/MMHotGrid'
 import './App.css'
 
 export default function App() {
@@ -55,6 +57,7 @@ export default function App() {
           <Route path="/powerball/predict"    element={<PBPredict />} />
           <Route path="/powerball/beam-predict" element={<PBBeamPredict />} />
           <Route path="/powerball/matrix"   element={<PBMatrixPage />} />
+          <Route path="/powerball/hotgrid"  element={<PBHotGrid />} />
           <Route path="/powerball/pb-matrix" element={<PBBallMatrixPage />} />
           <Route path="/powerball/history"  element={<PBHistory />} />
           <Route path="/powerball/add"      element={<PBAddResult />} />
@@ -63,6 +66,7 @@ export default function App() {
           <Route path="/megamillions/predict"      element={<MMPredict />} />
           <Route path="/megamillions/beam-predict" element={<MMBeamPredict />} />
           <Route path="/megamillions/matrix"    element={<MMMatrixPage />} />
+          <Route path="/megamillions/hotgrid"   element={<MMHotGrid />} />
           <Route path="/megamillions/mb-matrix" element={<MMBallMatrixPage />} />
           <Route path="/megamillions/history"   element={<MMHistory />} />
           <Route path="/megamillions/add"       element={<MMAddResult />} />

@@ -58,6 +58,7 @@ export default function Navbar() {
             <NavLink to="/powerball/predict" className={({ isActive }) => isActive ? 'nav-link active nav-link-pb' : 'nav-link nav-link-pb'}>🔮 Predict</NavLink>
             <NavLink to="/powerball/beam-predict" className={({ isActive }) => isActive ? 'nav-link active nav-link-pb' : 'nav-link nav-link-pb'}>⚡ Beam</NavLink>
             <NavLink to="/powerball/matrix" className={({ isActive }) => isActive ? 'nav-link active nav-link-pb' : 'nav-link nav-link-pb'}>🗂 Matrix</NavLink>
+            <NavLink to="/powerball/hotgrid" className={({ isActive }) => isActive ? 'nav-link active nav-link-pb' : 'nav-link nav-link-pb'}>🔥 Hot Grid</NavLink>
             <NavLink to="/powerball/pb-matrix" className={({ isActive }) => isActive ? 'nav-link active nav-link-pb' : 'nav-link nav-link-pb'}>🔴 PB Matrix</NavLink>
             <NavLink to="/powerball/history" className={({ isActive }) => isActive ? 'nav-link active nav-link-pb' : 'nav-link nav-link-pb'}>History</NavLink>
             <NavLink to="/powerball/add" className={({ isActive }) => isActive ? 'nav-link active nav-link-pb' : 'nav-link nav-link-pb'}>+ Add</NavLink>
@@ -69,6 +70,7 @@ export default function Navbar() {
             <NavLink to="/megamillions/predict" className={({ isActive }) => isActive ? 'nav-link active nav-link-mm' : 'nav-link nav-link-mm'}>🔮 Predict</NavLink>
             <NavLink to="/megamillions/beam-predict" className={({ isActive }) => isActive ? 'nav-link active nav-link-mm' : 'nav-link nav-link-mm'}>⚡ Beam</NavLink>
             <NavLink to="/megamillions/matrix" className={({ isActive }) => isActive ? 'nav-link active nav-link-mm' : 'nav-link nav-link-mm'}>🗂 Matrix</NavLink>
+            <NavLink to="/megamillions/hotgrid" className={({ isActive }) => isActive ? 'nav-link active nav-link-mm' : 'nav-link nav-link-mm'}>🔥 Hot Grid</NavLink>
             <NavLink to="/megamillions/mb-matrix" className={({ isActive }) => isActive ? 'nav-link active nav-link-mm' : 'nav-link nav-link-mm'}>🟡 MB Matrix</NavLink>
             <NavLink to="/megamillions/history" className={({ isActive }) => isActive ? 'nav-link active nav-link-mm' : 'nav-link nav-link-mm'}>History</NavLink>
             <NavLink to="/megamillions/add" className={({ isActive }) => isActive ? 'nav-link active nav-link-mm' : 'nav-link nav-link-mm'}>+ Add</NavLink>
