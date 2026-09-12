@@ -1,5 +1,11 @@
 const MAX_DEFAULT = 45
 const BP_DIRS = { NW:{dc:-1,dr:-1}, NE:{dc:+1,dr:-1}, SW:{dc:-1,dr:+1}, SE:{dc:+1,dr:+1} }
+const HYBRID_LEARNING_KEY = 'lottery_hybrid_learning_v1'
+const HYBRID_LEARNING_LIMIT = 80
+
+function canUseLocalStorage() {
+  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
+}
 
 function normalizeDraw(draw) {
   return Array.isArray(draw) ? draw.map(Number).sort((a, b) => a - b) : (draw?.numbers || []).map(Number).sort((a, b) => a - b)
@@ -30,6 +36,126 @@ function addRanked(score, list, weight, label, maxNum, top = 25) {
   list.slice(0, top).forEach((r, idx) => {
     addScore(score, r.n, (top - idx) * weight, `${label}#${idx + 1}`, maxNum)
   })
+}
+
+function readLearningState() {
+  if (!canUseLocalStorage()) return { history: [], adjustments: {}, updatedAt: null }
+  try {
+    const raw = window.localStorage.getItem(HYBRID_LEARNING_KEY)
+    if (!raw) return { history: [], adjustments: {}, updatedAt: null }
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return { history: [], adjustments: {}, updatedAt: null }
+    return {
+      history: Array.isArray(parsed.history) ? parsed.history : [],
+      adjustments: parsed.adjustments && typeof parsed.adjustments === 'object' ? parsed.adjustments : {},
+      updatedAt: parsed.updatedAt || null,
+    }
+  } catch {
+    return { history: [], adjustments: {}, updatedAt: null }
+  }
+}
+
+function writeLearningState(state) {
+  if (!canUseLocalStorage()) return
+  try {
+    window.localStorage.setItem(HYBRID_LEARNING_KEY, JSON.stringify(state))
+  } catch {
+    // Ignore storage failures; prediction still works without persistence.
+  }
+}
+
+function rebuildLearningAdjustments(history) {
+  const adjustments = {}
+  history.slice(-HYBRID_LEARNING_LIMIT).forEach(entry => {
+    const predicted = Array.isArray(entry.predicted) ? [...new Set(entry.predicted.map(Number).filter(Number.isFinite))] : []
+    const actual = Array.isArray(entry.actual) ? [...new Set(entry.actual.map(Number).filter(Number.isFinite))] : []
+    const actualSet = new Set(actual)
+
+    predicted.forEach((n, idx) => {
+      const hit = actualSet.has(n)
+      const weight = hit ? Math.max(0.8, 4.5 - idx * 0.22) : -(Math.max(0.4, 2.2 - idx * 0.12))
+      adjustments[n] = (adjustments[n] || 0) + weight
+    })
+
+    actual.forEach((n, idx) => {
+      const pos = predicted.indexOf(n)
+      const lift = pos >= 0
+        ? Math.max(1.2, 5.5 - pos * 0.25)
+        : Math.max(2.5, 4.5 - idx * 0.15)
+      adjustments[n] = (adjustments[n] || 0) + lift
+    })
+  })
+
+  return Object.entries(adjustments).reduce((acc, [n, value]) => {
+    acc[n] = Math.max(-6, Math.min(14, +value.toFixed(2)))
+    return acc
+  }, {})
+}
+
+function getLearningAdjustments() {
+  const state = readLearningState()
+  return state.adjustments || {}
+}
+
+export function recordHybridPredictionFeedback({ drawNum, seeds = [], predicted = [], actual = [] } = {}) {
+  const cleanPredicted = [...new Set(predicted.map(Number).filter(Number.isFinite))].slice(0, 15)
+  const cleanActual = [...new Set(actual.map(Number).filter(n => Number.isFinite(n) && n >= 1 && n <= MAX_DEFAULT))].sort((a, b) => a - b)
+  if (!cleanActual.length) return null
+
+  const state = readLearningState()
+  const history = Array.isArray(state.history) ? state.history.slice() : []
+  const nextRecord = {
+    drawNum: Number(drawNum) || null,
+    seeds: [...new Set(seeds.map(Number).filter(Number.isFinite))].sort((a, b) => a - b),
+    predicted: cleanPredicted,
+    actual: cleanActual,
+    createdAt: new Date().toISOString(),
+  }
+
+  if (nextRecord.drawNum != null) {
+    const idx = history.findIndex(item => item.drawNum === nextRecord.drawNum)
+    if (idx >= 0) history[idx] = nextRecord
+    else history.push(nextRecord)
+  } else {
+    history.push(nextRecord)
+  }
+
+  const trimmed = history.slice(-HYBRID_LEARNING_LIMIT)
+  const adjustments = rebuildLearningAdjustments(trimmed)
+  const nextState = { history: trimmed, adjustments, updatedAt: new Date().toISOString() }
+  writeLearningState(nextState)
+
+  const actualSet = new Set(cleanActual)
+  const hits = cleanPredicted.filter(n => actualSet.has(n))
+
+  return {
+    ...nextRecord,
+    hits,
+    misses: cleanPredicted.filter(n => !actualSet.has(n)),
+    adjustments,
+    hitCount: hits.length,
+    actualCount: cleanActual.length,
+  }
+}
+
+export function getHybridLearningSummary() {
+  const state = readLearningState()
+  const history = Array.isArray(state.history) ? state.history : []
+  const latest = history[history.length - 1] || null
+  if (!latest) return null
+
+  const actualSet = new Set(latest.actual || [])
+  const hits = (latest.predicted || []).filter(n => actualSet.has(n))
+  return {
+    totalRecords: history.length,
+    latestDrawNum: latest.drawNum,
+    actual: latest.actual || [],
+    predicted: latest.predicted || [],
+    hits,
+    misses: (latest.predicted || []).filter(n => !actualSet.has(n)),
+    adjustments: state.adjustments || {},
+    updatedAt: state.updatedAt,
+  }
 }
 
 function beamHits(slice, ci, seed, maxNum) {
@@ -545,6 +671,11 @@ export function computeHybridPrediction(drawsInput, { maxNum = MAX_DEFAULT, excl
   applyDeepLowHoldRescue(score, seeds, maxNum)
   applySecondLowHoldRebound(score, seeds, maxNum)
   applyPlusMinusOneCorrection(score, maxNum)
+
+  const learnedAdjustments = getLearningAdjustments()
+  Object.entries(learnedAdjustments).forEach(([n, pts]) => {
+    addScore(score, +n, pts, 'learned-feedback', maxNum)
+  })
 
   const seedSet = new Set(seeds)
   const raw = ranked(score).filter(r => !excludeSeeds || !seedSet.has(r.n))

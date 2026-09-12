@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { fetchAllDraws, insertDraw, invalidateDrawsCache } from '../lib/supabase'
 import { postMortem } from '../utils/predictionEngine'
-import { computeHybridPrediction } from '../utils/hybridPrediction'
+import { computeHybridPrediction, recordHybridPredictionFeedback, getHybridLearningSummary } from '../utils/hybridPrediction'
 import './AddResult.css'
 
 export default function AddResult() {
@@ -13,6 +13,7 @@ export default function AddResult() {
   const [saveInfo, setSaveInfo] = useState(null)  // { local: true, cloud: bool }
   const [error, setError]     = useState(null)
   const [preview, setPreview] = useState(null)
+  const [learningInfo, setLearningInfo] = useState(null)
 
   useEffect(() => { fetchAllDraws().then(setDraws).finally(() => setLoading(false)) }, [])
 
@@ -47,7 +48,18 @@ export default function AddResult() {
     setSaving(true)
     setError(null)
     try {
+      const predictedTop = currentPrediction?.results.slice(0, 15).map(r => r.number) || []
       const result = await insertDraw(nextId, nums)
+      if (latest && predictedTop.length) {
+        setLearningInfo(recordHybridPredictionFeedback({
+          drawNum: nextId,
+          seeds: latest.numbers,
+          predicted: predictedTop,
+          actual: nums,
+        }))
+      } else {
+        setLearningInfo(getHybridLearningSummary())
+      }
       setSaveInfo({ local: true, cloud: result.supabaseSaved })
       setSuccess(true)
       setNumbers(['', '', '', '', ''])
@@ -64,7 +76,8 @@ export default function AddResult() {
 
   if (loading) return <div className="page-loading"><div className="spinner"/><span>Loading…</span></div>
 
-  const prediction = latest ? (computeHybridPrediction(draws)?.results.slice(0, 5) || []) : []
+  const currentPrediction = latest ? computeHybridPrediction(draws) : null
+  const prediction = currentPrediction ? currentPrediction.results.slice(0, 5) : []
 
   return (
     <div className="add-result-page">
@@ -140,6 +153,19 @@ export default function AddResult() {
                 <span className="bond-count">{count}x</span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {learningInfo && (
+        <div className="learning-card">
+          <h2>Learning Memory</h2>
+          <p className="learning-summary">
+            Recorded D{learningInfo.drawNum || nextId} feedback: {learningInfo.hitCount || 0} / {learningInfo.predicted?.length || 0} predicted numbers matched the actual result.
+          </p>
+          <div className="learning-chips">
+            {learningInfo.hits?.slice(0, 5).map(n => <span key={`hit-${n}`} className="learn-chip hit">Hit {n}</span>)}
+            {learningInfo.misses?.slice(0, 5).map(n => <span key={`miss-${n}`} className="learn-chip miss">Miss {n}</span>)}
           </div>
         </div>
       )}

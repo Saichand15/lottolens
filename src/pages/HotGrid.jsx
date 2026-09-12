@@ -47,15 +47,26 @@ function buildDigitPairCalculator(pairInput, maxNum = MAXN) {
 
   const rows = [
     { label: `${a} + ${b}`, value: a + b },
+    { label: `${a} + ${b} - 1`, value: a + b - 1 },
+    { label: `${a} + ${b} + 1`, value: a + b + 1 },
     { label: `${A.tens} + ${A.ones} + ${B.tens} + ${B.ones}`, value: A.tens + A.ones + B.tens + B.ones },
+    { label: `${A.tens} + ${B.tens} + ${A.ones}`, value: A.tens + B.tens + A.ones },
+    { label: `${A.tens} + ${B.ones}`, value: A.tens + B.ones },
+    { label: `${A.ones} + ${B.tens}`, value: A.ones + B.tens },
+    { label: `${A.ones} + ${B.ones}`, value: A.ones + B.ones },
     { label: `${b} - ${A.ones}`, value: b - A.ones },
+    { label: `${b} - ${A.tens}`, value: b - A.tens },
     { label: `${b} - ${a}`, value: b - a },
     { label: `${b} + ${A.ones} + ${A.tens}`, value: b + A.ones + A.tens },
     { label: `${a} + ${B.ones} + ${B.tens}`, value: a + B.ones + B.tens },
+    { label: `${a} + ${B.tens}`, value: a + B.tens },
+    { label: `${b} + ${A.tens}`, value: b + A.tens },
     { label: `${b} + ${A.ones}`, value: b + A.ones },
     { label: `${a} + ${B.ones}`, value: a + B.ones },
     { label: `${B.ones} + ${A.ones} + ${A.tens}`, value: B.ones + A.ones + A.tens },
     { label: `${hi} - ${lo}`, value: hi - lo },
+    { label: `${hi} - ${lo} - 1`, value: hi - lo - 1 },
+    { label: `${hi} - ${lo} + 1`, value: hi - lo + 1 },
     { label: `${hi} + ${lo}`, value: hi + lo },
   ]
 
@@ -93,21 +104,62 @@ function calcDigitRecipesForPair(aRaw, bRaw) {
   const b = Math.max(aNum, bNum)
   const A = splitPairDigits(a)
   const B = splitPairDigits(b)
+  const hi = Math.max(a, b)
+  const lo = Math.min(a, b)
 
   return [
     { label: `${a} + ${b}`, value: a + b },
+    { label: `${a} + ${b} - 1`, value: a + b - 1 },
+    { label: `${a} + ${b} + 1`, value: a + b + 1 },
     { label: `${A.tens} + ${A.ones} + ${B.tens} + ${B.ones}`, value: A.tens + A.ones + B.tens + B.ones },
+    { label: `${A.tens} + ${B.tens} + ${A.ones}`, value: A.tens + B.tens + A.ones },
+    { label: `${A.tens} + ${B.ones}`, value: A.tens + B.ones },
+    { label: `${A.ones} + ${B.tens}`, value: A.ones + B.tens },
+    { label: `${A.ones} + ${B.ones}`, value: A.ones + B.ones },
     { label: `${b} - ${A.ones}`, value: b - A.ones },
+    { label: `${b} - ${A.tens}`, value: b - A.tens },
+    { label: `${a} - ${B.ones} - ${B.tens}`, value: a - B.ones - B.tens },
+    { label: `${b} - ${A.ones} - ${A.tens}`, value: b - A.ones - A.tens },
     { label: `${b} - ${a}`, value: b - a },
     { label: `${b} + ${A.ones} + ${A.tens}`, value: b + A.ones + A.tens },
     { label: `${a} + ${B.ones} + ${B.tens}`, value: a + B.ones + B.tens },
+    { label: `${a} + ${B.tens}`, value: a + B.tens },
+    { label: `${b} + ${A.tens}`, value: b + A.tens },
     { label: `${b} + ${A.ones}`, value: b + A.ones },
     { label: `${a} + ${B.ones}`, value: a + B.ones },
     { label: `${B.ones} + ${A.ones} + ${A.tens}`, value: B.ones + A.ones + A.tens },
+    { label: `${hi} - ${lo}`, value: hi - lo },
+    { label: `${hi} - ${lo} - 1`, value: hi - lo - 1 },
+    { label: `${hi} - ${lo} + 1`, value: hi - lo + 1 },
+    { label: `${hi} + ${lo}`, value: hi + lo },
   ].filter(r => Number.isFinite(r.value) && r.value >= 1)
 }
 
-function buildTouchDigitOverlap(laserHits, activeDir) {
+function calcDigitRecipesForTriple(aRaw, bRaw, cRaw) {
+  const nums = [aRaw, bRaw, cRaw].map(n => Math.round(Number(n))).filter(Number.isFinite).sort((x, y) => x - y)
+  if (nums.length < 3) return []
+
+  const [a, b, c] = nums
+  const A = splitPairDigits(a)
+  const B = splitPairDigits(b)
+  const C = splitPairDigits(c)
+
+  return [
+    { label: `${a} + ${b} + ${c}`, value: a + b + c },
+    { label: `${a} + ${b} + ${c} - 1`, value: a + b + c - 1 },
+    { label: `${a} + ${b} + ${c} + 1`, value: a + b + c + 1 },
+    { label: `${c} - ${b} - ${a}`, value: c - b - a },
+    { label: `${c} - ${b} + ${a}`, value: c - b + a },
+    { label: `${c} - ${A.ones} - ${B.ones}`, value: c - A.ones - B.ones },
+    { label: `${c} + ${A.ones} + ${B.ones}`, value: c + A.ones + B.ones },
+    { label: `${A.tens} + ${B.ones} + ${C.ones}`, value: A.tens + B.ones + C.ones },
+    { label: `${A.ones} + ${B.ones} + ${C.ones}`, value: A.ones + B.ones + C.ones },
+    { label: `${a} + ${B.tens} + ${C.tens}`, value: a + B.tens + C.tens },
+    { label: `${b} - ${A.ones} - ${C.tens}`, value: b - A.ones - C.tens },
+  ].filter(r => Number.isFinite(r.value) && r.value >= 1)
+}
+
+function buildTouchDigitOverlap(laserHits, activeDir, recentDraws = []) {
   if (!laserHits?.cornerTouch) return null
 
   const touched = new Set()
@@ -118,10 +170,13 @@ function buildTouchDigitOverlap(laserHits, activeDir) {
   })
 
   const nums = [...touched].sort((a, b) => a - b)
-  if (nums.length < 2) return { nums, common: [], ranked: [], pairCount: 0 }
+  if (nums.length < 2) return { nums, common: [], exact: [], ranked: [], pairCount: 0, tripleCount: 0, strong: [] }
+
+  const recentSets = recentDraws.map(draw => new Set(Array.isArray(draw) ? draw : draw?.numbers || []))
 
   const tally = {}
   let pairCount = 0
+  let tripleCount = 0
   for (let i = 0; i < nums.length; i++) {
     for (let j = i + 1; j < nums.length; j++) {
       pairCount++
@@ -131,7 +186,7 @@ function buildTouchDigitOverlap(laserHits, activeDir) {
       const recipes = calcDigitRecipesForPair(a, b)
 
       recipes.forEach(({ label, value }) => {
-        if (!tally[value]) tally[value] = { pairs: new Set(), total: 0, labels: [] }
+        if (!tally[value]) tally[value] = { pairs: new Set(), triples: new Set(), total: 0, labels: [] }
         tally[value].pairs.add(pairKey)
         tally[value].total += 1
         const tag = `${a},${b}: ${label}`
@@ -140,22 +195,58 @@ function buildTouchDigitOverlap(laserHits, activeDir) {
     }
   }
 
+  for (let i = 0; i < nums.length; i++) {
+    for (let j = i + 1; j < nums.length; j++) {
+      for (let k = j + 1; k < nums.length; k++) {
+        tripleCount++
+        const a = nums[i]
+        const b = nums[j]
+        const c = nums[k]
+        const tripleKey = `${a}-${b}-${c}`
+        const recipes = calcDigitRecipesForTriple(a, b, c)
+
+        recipes.forEach(({ label, value }) => {
+          if (!tally[value]) tally[value] = { pairs: new Set(), triples: new Set(), total: 0, labels: [] }
+          tally[value].triples.add(tripleKey)
+          tally[value].total += 1
+          const tag = `${a},${b},${c}: ${label}`
+          if (!tally[value].labels.includes(tag)) tally[value].labels.push(tag)
+        })
+      }
+    }
+  }
+
+  const recentByValue = {}
+  recentSets.forEach((set, idx) => {
+    set.forEach(n => {
+      if (!recentByValue[n]) recentByValue[n] = { count: 0, draws: [] }
+      recentByValue[n].count += 1
+      recentByValue[n].draws.push(recentDraws[idx]?.id || recentDraws.length - idx)
+    })
+  })
+
   const ranked = Object.entries(tally)
     .map(([n, info]) => ({
       n: +n,
       pairCount: info.pairs.size,
+      tripleCount: info.triples?.size || 0,
       total: info.total,
+      recentCount: recentByValue[n]?.count || 0,
+      recentDraws: recentByValue[n]?.draws || [],
       pairs: [...info.pairs].sort(),
+      triples: [...(info.triples || new Set())].sort(),
       labels: info.labels,
     }))
-    .sort((a, b) => b.pairCount - a.pairCount || b.total - a.total || a.n - b.n)
+    .sort((a, b) => b.recentCount - a.recentCount || (b.pairCount + b.tripleCount) - (a.pairCount + a.tripleCount) || b.total - a.total || a.n - b.n)
 
   return {
     nums,
     pairCount,
+    tripleCount,
     ranked,
     common: ranked.filter(r => r.pairCount >= 2),
-    strong: ranked.filter(r => r.pairCount >= 3),
+    exact: ranked.filter(r => r.pairCount >= 2 && r.recentCount > 0),
+    strong: ranked.filter(r => r.pairCount + r.tripleCount >= 3),
   }
 }
 
@@ -279,12 +370,15 @@ export default function HotGrid() {
   const [window_,  setWindow]   = useState(100)
   const [selectedNumber, setSelectedNumber] = useState(null)
   const [selectedCell,   setSelectedCell]   = useState(null)
+  const [selectedPair, setSelectedPair] = useState([])
   const [activeDir, setActiveDir] = useState({ NE: true, NW: true, SE: true, SW: true })
   const [panelOpen, setPanelOpen] = useState(false)
   const [sideTab,   setSideTab]   = useState('touch')  // 'touch' | 'math' | 'history' | 'pair' | 'ai' | 'stats'
   const [historyDir, setHistoryDir] = useState('SW')
   const [manualStepInput, setManualStepInput] = useState('')
   const [pairStepInput, setPairStepInput] = useState('24,27')
+  const [repeatCaptureMap, setRepeatCaptureMap] = useState({})
+  const captureSeenRef = useRef(new Set())
   const scrollRef = useRef(null)
 
   useEffect(() => {
@@ -387,12 +481,22 @@ export default function HotGrid() {
     setSelectedCell({ colIdx, rowNum })
     setSelectedNumber(rowNum)
     setPanelOpen(true)
+    setSelectedPair(prev => {
+      if (prev.includes(rowNum)) return prev.filter(x => x !== rowNum)
+      if (prev.length >= 2) return [prev[1], rowNum]
+      return [...prev, rowNum]
+    })
   }, [])
 
   const handleRowClick  = useCallback((n) => {
     setSelectedNumber(prev => prev === n ? null : n)
     setSelectedCell(null)
     setPanelOpen(true)
+    setSelectedPair(prev => {
+      if (prev.includes(n)) return prev.filter(x => x !== n)
+      if (prev.length >= 2) return [prev[1], n]
+      return [...prev, n]
+    })
   }, [])
 
   const handleDirToggle = useCallback((dir) => setActiveDir(prev => ({ ...prev, [dir]: !prev[dir] })), [])
@@ -401,6 +505,7 @@ export default function HotGrid() {
     setSelectedCell(null)
     setPanelOpen(false)
     setManualStepInput('')
+    setSelectedPair([])
   }, [])
 
   // ── Math tab: arithmetic combinations of beam STEP numbers only ─────────────
@@ -510,6 +615,13 @@ export default function HotGrid() {
     return out
   }, [selectedNumber, allDraws])
 
+  useEffect(() => {
+    if (selectedPair.length === 2) {
+      setPairStepInput(selectedPair.join(','))
+      setPanelOpen(true)
+    }
+  }, [selectedPair])
+
   const stepHistoryData = useMemo(() => {
     const manualSteps = parseStepsInput(manualStepInput)
     const targetProfile = currentStepProfiles?.[historyDir] || null
@@ -567,8 +679,68 @@ export default function HotGrid() {
     }
   }, [manualStepInput, currentStepProfiles, historyDir, historyOccurrences])
 
-  const pairCalcData = useMemo(() => buildDigitPairCalculator(pairStepInput, MAXN), [pairStepInput])
-  const touchDigitData = useMemo(() => buildTouchDigitOverlap(laserHits, activeDir), [laserHits, activeDir])
+  const pairInputValue = selectedPair.length === 2 ? selectedPair.join(',') : pairStepInput
+  const pairCalcData = useMemo(() => buildDigitPairCalculator(pairInputValue, MAXN), [pairInputValue])
+  const touchDigitData = useMemo(() => buildTouchDigitOverlap(laserHits, activeDir, allDraws.slice(-5)), [laserHits, activeDir, allDraws])
+
+  useEffect(() => {
+    if (!selectedNumber || !touchDigitData) return
+    const captureKey = `${selectedNumber}-${selectedCell?.colIdx ?? 'row'}-${Object.values(activeDir).map(v => (v ? 1 : 0)).join('')}`
+    if (captureSeenRef.current.has(captureKey)) return
+
+    const pool = (touchDigitData.exact?.length ? touchDigitData.exact : touchDigitData.common || []).slice(0, 20)
+    if (!pool.length) return
+
+    setRepeatCaptureMap(prev => {
+      const next = { ...prev }
+      pool.forEach(item => {
+        const n = item.n
+        const strength = (item.pairCount || 0) + (item.tripleCount || 0) + (item.recentCount || 0)
+        const existing = next[n] || {
+          number: n,
+          hitCount: 0,
+          totalStrength: 0,
+          seeds: [],
+          sampleLabels: [],
+          lastSeenAt: null,
+        }
+        const seedSet = new Set(existing.seeds)
+        seedSet.add(selectedNumber)
+        const labels = [...existing.sampleLabels]
+        ;(item.labels || []).slice(0, 2).forEach(label => {
+          if (!labels.includes(label)) labels.push(label)
+        })
+        next[n] = {
+          ...existing,
+          hitCount: existing.hitCount + 1,
+          totalStrength: existing.totalStrength + strength,
+          seeds: [...seedSet].sort((a, b) => a - b),
+          sampleLabels: labels.slice(0, 6),
+          lastSeenAt: new Date().toISOString(),
+        }
+      })
+      return next
+    })
+
+    captureSeenRef.current.add(captureKey)
+  }, [selectedNumber, selectedCell, touchDigitData, activeDir])
+
+  const repeatCaptureList = useMemo(() => {
+    return Object.values(repeatCaptureMap)
+      .map(item => ({
+        ...item,
+        seedCount: (item.seeds || []).length,
+        avgStrength: item.hitCount ? +(item.totalStrength / item.hitCount).toFixed(2) : 0,
+      }))
+      .sort((a, b) => b.seedCount - a.seedCount || b.hitCount - a.hitCount || b.avgStrength - a.avgStrength || a.number - b.number)
+  }, [repeatCaptureMap])
+
+  const repeatStrong = useMemo(() => repeatCaptureList.filter(item => item.seedCount >= 2), [repeatCaptureList])
+
+  const clearRepeatCapture = useCallback(() => {
+    setRepeatCaptureMap({})
+    captureSeenRef.current = new Set()
+  }, [])
 
   if (loading) return <div className="hg-loading"><div className="hg-spinner"/>Loading hot grid...</div>
 
@@ -764,6 +936,7 @@ export default function HotGrid() {
                 {[
                   { key: 'touch', label: 'Touch' },
                   { key: 'math',  label: `Math ${mathCandidates.length ? `(${mathCandidates.length})` : ''}` },
+                  { key: 'capture', label: `Repeat Capture ${repeatStrong.length ? `(${repeatStrong.length})` : ''}` },
                   { key: 'history', label: 'Step History' },
                   { key: 'pair', label: 'Digit Calc' },
                   { key: 'ai', label: 'AI Analyzer' },
@@ -843,16 +1016,33 @@ export default function HotGrid() {
                             ))}
                           </div>
 
+                          {touchDigitData.exact.length > 0 && (
+                            <div className="hg-touch-exact-box">
+                              <div className="hg-touch-exact-title">Exact picks confirmed by the last 5 draws</div>
+                              <div className="hg-touch-exact-list">
+                                {touchDigitData.exact.slice(0, 8).map(({ n, pairCount, tripleCount, total, recentCount, recentDraws, labels }) => (
+                                  <button key={`touch-exact-${n}`} className="hg-touch-exact-pill" onClick={() => handleRowClick(n)}>
+                                    <span className="hg-touch-exact-num">{n}</span>
+                                    <span className="hg-touch-exact-meta">{pairCount} pairs · {tripleCount} triples · {total} hits · in {recentCount} of last 5</span>
+                                    <span className="hg-touch-exact-formula">{labels.slice(0, 3).join(' | ')}</span>
+                                    <span className="hg-touch-exact-draws">{recentDraws.slice(0, 3).map(d => `D${d}`).join(' · ')}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
                           {touchDigitData.common.length > 0 ? (
                             <>
                               <div className="hg-pair-grid" style={{ marginTop: 8 }}>
-                                {touchDigitData.common.slice(0, 10).map(({ n, pairCount, total }) => (
+                                {touchDigitData.common.slice(0, 10).map(({ n, pairCount, tripleCount, total, recentCount }) => (
                                   <div key={`touch-common-${n}`} className="hg-pair-card">
                                     <div className="hg-pair-card-head">
                                       <span className="hg-pair-value">{n}</span>
-                                      <span className="hg-pair-index">{pairCount} pairs</span>
+                                      <span className="hg-pair-index">{pairCount + tripleCount} combos</span>
                                     </div>
                                     <div className="hg-pair-card-total">{total} formula hits</div>
+                                    <div className="hg-pair-card-line">{recentCount > 0 ? `confirmed in last 5: ${recentCount}` : 'not seen in last 5'}</div>
                                   </div>
                                 ))}
                               </div>
@@ -923,6 +1113,50 @@ export default function HotGrid() {
                       </div>
                     </>
                   )}
+                </div>
+              )}
+
+              {/* ── REPEAT CAPTURE TAB ── */}
+              {sideTab === 'capture' && (
+                <div className="hg-step-history-panel">
+                  <div className="hg-history-card">
+                    <div className="hg-capture-head-row">
+                      <div className="hg-history-card-title">Recurring values across inspected numbers</div>
+                      <button className="hg-capture-clear-btn" onClick={clearRepeatCapture}>Reset</button>
+                    </div>
+                    <div className="hg-history-note">
+                      Auto-captures values from Touch calculations after you click gold cells. Strong values are numbers that repeat across multiple seed inspections.
+                    </div>
+
+                    {repeatStrong.length > 0 ? (
+                      <div className="hg-capture-list">
+                        {repeatStrong.slice(0, 20).map(item => (
+                          <button key={`cap-${item.number}`} className="hg-capture-item" onClick={() => handleRowClick(item.number)}>
+                            <span className="hg-capture-num">{item.number}</span>
+                            <span className="hg-capture-meta">seen in {item.seedCount} seeds · {item.hitCount} captures · avg {item.avgStrength}</span>
+                            <span className="hg-capture-seeds">Seeds: {(item.seeds || []).slice(0, 10).join(', ')}</span>
+                            <span className="hg-capture-formula">{(item.sampleLabels || []).slice(0, 2).join(' | ')}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="hg-tab-empty">Inspect at least two different numbers first. Repeated values (like 9 across multiple checks) will appear here.</div>
+                    )}
+
+                    {repeatCaptureList.length > 0 && (
+                      <div className="hg-capture-all-wrap">
+                        <div className="hg-history-examples-title">All captured values (latest ranking)</div>
+                        <div className="hg-capture-all-grid">
+                          {repeatCaptureList.slice(0, 24).map(item => (
+                            <button key={`cap-all-${item.number}`} className="hg-capture-pill" onClick={() => handleRowClick(item.number)}>
+                              <span>{item.number}</span>
+                              <small>{item.seedCount}s</small>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -1049,15 +1283,33 @@ export default function HotGrid() {
                     </div>
 
                     <div className="hg-pair-example">
-                      Pair input: {pairStepInput || '—'}
+                      Pair input: {pairInputValue || '—'}
                     </div>
+
+                    {selectedPair.length > 0 && (
+                      <div className="hg-pair-picked-row">
+                        <div className="hg-pair-picked-label">Grid selection</div>
+                        <div className="hg-pair-picked-chips">
+                          {selectedPair.map(n => (
+                            <span key={n} className="hg-pair-picked-chip">#{n}</span>
+                          ))}
+                          {selectedPair.length === 1 && <span className="hg-pair-picked-hint">pick one more number</span>}
+                        </div>
+                        <button
+                          className="hg-pair-clear-btn"
+                          onClick={() => { setSelectedPair([]); setPairStepInput('') }}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
 
                     <div className="hg-pair-input-row">
                       <input
                         className="hg-history-input"
                         inputMode="numeric"
-                        value={pairStepInput}
-                        onChange={e => setPairStepInput(e.target.value)}
+                        value={pairInputValue}
+                        onChange={e => { setSelectedPair([]); setPairStepInput(e.target.value) }}
                         placeholder="Enter numbers like 24,27"
                       />
                     </div>
