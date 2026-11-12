@@ -2,6 +2,8 @@
 import { fetchAllDraws } from '../lib/supabase'
 import { computeLaserHits } from '../utils/predictionEngine'
 import { buildTransitionMatrix, buildCoOccurrence, buildGapMap } from '../utils/dataUtils'
+import { analyzePuzzleLShapes } from '../utils/puzzleLShapes'
+import { splitPairDigits, buildTouchDigitOverlap, getCapturePool, rankRepeatCaptures, buildPuzzleBoxes } from '../utils/puzzleCapture'
 import LaserLayer from '../components/LaserLayer'
 import './HotGrid.css'
 
@@ -23,15 +25,6 @@ function sameNumList(a = [], b = []) {
 
 function parseStepsInput(text) {
   return uniqSorted((text || '').split(/[^\d]+/).map(Number).filter(n => Number.isFinite(n) && n > 0))
-}
-
-function splitPairDigits(n) {
-  const text = String(Math.abs(Math.round(Number(n) || 0))).padStart(2, '0')
-  return {
-    tens: +text[0],
-    ones: +text[text.length - 1],
-    digits: text.split('').map(Number),
-  }
 }
 
 function buildDigitPairCalculator(pairInput, maxNum = MAXN) {
@@ -92,161 +85,6 @@ function buildDigitPairCalculator(pairInput, maxNum = MAXN) {
       .map(([n, info]) => ({ n: +n, count: info.count, rows: info.rows }))
       .filter(r => r.count >= 2)
       .sort((a, b) => b.count - a.count || a.n - b.n),
-  }
-}
-
-function calcDigitRecipesForPair(aRaw, bRaw) {
-  const aNum = Math.round(Number(aRaw))
-  const bNum = Math.round(Number(bRaw))
-  if (!Number.isFinite(aNum) || !Number.isFinite(bNum)) return []
-
-  const a = Math.min(aNum, bNum)
-  const b = Math.max(aNum, bNum)
-  const A = splitPairDigits(a)
-  const B = splitPairDigits(b)
-  const hi = Math.max(a, b)
-  const lo = Math.min(a, b)
-
-  return [
-    { label: `${a} + ${b}`, value: a + b },
-    { label: `${a} + ${b} - 1`, value: a + b - 1 },
-    { label: `${a} + ${b} + 1`, value: a + b + 1 },
-    { label: `${A.tens} + ${A.ones} + ${B.tens} + ${B.ones}`, value: A.tens + A.ones + B.tens + B.ones },
-    { label: `${A.tens} + ${B.tens} + ${A.ones}`, value: A.tens + B.tens + A.ones },
-    { label: `${A.tens} + ${B.ones}`, value: A.tens + B.ones },
-    { label: `${A.ones} + ${B.tens}`, value: A.ones + B.tens },
-    { label: `${A.ones} + ${B.ones}`, value: A.ones + B.ones },
-    { label: `${b} - ${A.ones}`, value: b - A.ones },
-    { label: `${b} - ${A.tens}`, value: b - A.tens },
-    { label: `${a} - ${B.ones} - ${B.tens}`, value: a - B.ones - B.tens },
-    { label: `${b} - ${A.ones} - ${A.tens}`, value: b - A.ones - A.tens },
-    { label: `${b} - ${a}`, value: b - a },
-    { label: `${b} + ${A.ones} + ${A.tens}`, value: b + A.ones + A.tens },
-    { label: `${a} + ${B.ones} + ${B.tens}`, value: a + B.ones + B.tens },
-    { label: `${a} + ${B.tens}`, value: a + B.tens },
-    { label: `${b} + ${A.tens}`, value: b + A.tens },
-    { label: `${b} + ${A.ones}`, value: b + A.ones },
-    { label: `${a} + ${B.ones}`, value: a + B.ones },
-    { label: `${B.ones} + ${A.ones} + ${A.tens}`, value: B.ones + A.ones + A.tens },
-    { label: `${hi} - ${lo}`, value: hi - lo },
-    { label: `${hi} - ${lo} - 1`, value: hi - lo - 1 },
-    { label: `${hi} - ${lo} + 1`, value: hi - lo + 1 },
-    { label: `${hi} + ${lo}`, value: hi + lo },
-  ].filter(r => Number.isFinite(r.value) && r.value >= 1)
-}
-
-function calcDigitRecipesForTriple(aRaw, bRaw, cRaw) {
-  const nums = [aRaw, bRaw, cRaw].map(n => Math.round(Number(n))).filter(Number.isFinite).sort((x, y) => x - y)
-  if (nums.length < 3) return []
-
-  const [a, b, c] = nums
-  const A = splitPairDigits(a)
-  const B = splitPairDigits(b)
-  const C = splitPairDigits(c)
-
-  return [
-    { label: `${a} + ${b} + ${c}`, value: a + b + c },
-    { label: `${a} + ${b} + ${c} - 1`, value: a + b + c - 1 },
-    { label: `${a} + ${b} + ${c} + 1`, value: a + b + c + 1 },
-    { label: `${c} - ${b} - ${a}`, value: c - b - a },
-    { label: `${c} - ${b} + ${a}`, value: c - b + a },
-    { label: `${c} - ${A.ones} - ${B.ones}`, value: c - A.ones - B.ones },
-    { label: `${c} + ${A.ones} + ${B.ones}`, value: c + A.ones + B.ones },
-    { label: `${A.tens} + ${B.ones} + ${C.ones}`, value: A.tens + B.ones + C.ones },
-    { label: `${A.ones} + ${B.ones} + ${C.ones}`, value: A.ones + B.ones + C.ones },
-    { label: `${a} + ${B.tens} + ${C.tens}`, value: a + B.tens + C.tens },
-    { label: `${b} - ${A.ones} - ${C.tens}`, value: b - A.ones - C.tens },
-  ].filter(r => Number.isFinite(r.value) && r.value >= 1)
-}
-
-function buildTouchDigitOverlap(laserHits, activeDir, recentDraws = []) {
-  if (!laserHits?.cornerTouch) return null
-
-  const touched = new Set()
-  ;['NE', 'NW', 'SE', 'SW'].forEach(dir => {
-    if (!activeDir?.[dir]) return
-    const ct = laserHits.cornerTouch?.[dir] || []
-    ct.filter(x => x.appeared).forEach(x => touched.add(x.number))
-  })
-
-  const nums = [...touched].sort((a, b) => a - b)
-  if (nums.length < 2) return { nums, common: [], exact: [], ranked: [], pairCount: 0, tripleCount: 0, strong: [] }
-
-  const recentSets = recentDraws.map(draw => new Set(Array.isArray(draw) ? draw : draw?.numbers || []))
-
-  const tally = {}
-  let pairCount = 0
-  let tripleCount = 0
-  for (let i = 0; i < nums.length; i++) {
-    for (let j = i + 1; j < nums.length; j++) {
-      pairCount++
-      const a = nums[i]
-      const b = nums[j]
-      const pairKey = `${a}-${b}`
-      const recipes = calcDigitRecipesForPair(a, b)
-
-      recipes.forEach(({ label, value }) => {
-        if (!tally[value]) tally[value] = { pairs: new Set(), triples: new Set(), total: 0, labels: [] }
-        tally[value].pairs.add(pairKey)
-        tally[value].total += 1
-        const tag = `${a},${b}: ${label}`
-        if (!tally[value].labels.includes(tag)) tally[value].labels.push(tag)
-      })
-    }
-  }
-
-  for (let i = 0; i < nums.length; i++) {
-    for (let j = i + 1; j < nums.length; j++) {
-      for (let k = j + 1; k < nums.length; k++) {
-        tripleCount++
-        const a = nums[i]
-        const b = nums[j]
-        const c = nums[k]
-        const tripleKey = `${a}-${b}-${c}`
-        const recipes = calcDigitRecipesForTriple(a, b, c)
-
-        recipes.forEach(({ label, value }) => {
-          if (!tally[value]) tally[value] = { pairs: new Set(), triples: new Set(), total: 0, labels: [] }
-          tally[value].triples.add(tripleKey)
-          tally[value].total += 1
-          const tag = `${a},${b},${c}: ${label}`
-          if (!tally[value].labels.includes(tag)) tally[value].labels.push(tag)
-        })
-      }
-    }
-  }
-
-  const recentByValue = {}
-  recentSets.forEach((set, idx) => {
-    set.forEach(n => {
-      if (!recentByValue[n]) recentByValue[n] = { count: 0, draws: [] }
-      recentByValue[n].count += 1
-      recentByValue[n].draws.push(recentDraws[idx]?.id || recentDraws.length - idx)
-    })
-  })
-
-  const ranked = Object.entries(tally)
-    .map(([n, info]) => ({
-      n: +n,
-      pairCount: info.pairs.size,
-      tripleCount: info.triples?.size || 0,
-      total: info.total,
-      recentCount: recentByValue[n]?.count || 0,
-      recentDraws: recentByValue[n]?.draws || [],
-      pairs: [...info.pairs].sort(),
-      triples: [...(info.triples || new Set())].sort(),
-      labels: info.labels,
-    }))
-    .sort((a, b) => b.recentCount - a.recentCount || (b.pairCount + b.tripleCount) - (a.pairCount + a.tripleCount) || b.total - a.total || a.n - b.n)
-
-  return {
-    nums,
-    pairCount,
-    tripleCount,
-    ranked,
-    common: ranked.filter(r => r.pairCount >= 2),
-    exact: ranked.filter(r => r.pairCount >= 2 && r.recentCount > 0),
-    strong: ranked.filter(r => r.pairCount + r.tripleCount >= 3),
   }
 }
 
@@ -373,11 +211,12 @@ export default function HotGrid() {
   const [selectedPair, setSelectedPair] = useState([])
   const [activeDir, setActiveDir] = useState({ NE: true, NW: true, SE: true, SW: true })
   const [panelOpen, setPanelOpen] = useState(false)
-  const [sideTab,   setSideTab]   = useState('touch')  // 'touch' | 'math' | 'history' | 'pair' | 'ai' | 'stats'
+  const [sideTab,   setSideTab]   = useState('touch')
   const [historyDir, setHistoryDir] = useState('SW')
   const [manualStepInput, setManualStepInput] = useState('')
   const [pairStepInput, setPairStepInput] = useState('24,27')
   const [repeatCaptureMap, setRepeatCaptureMap] = useState({})
+  const [puzzleDraw, setPuzzleDraw] = useState('latest')
   const captureSeenRef = useRef(new Set())
   const scrollRef = useRef(null)
 
@@ -683,12 +522,34 @@ export default function HotGrid() {
   const pairCalcData = useMemo(() => buildDigitPairCalculator(pairInputValue, MAXN), [pairInputValue])
   const touchDigitData = useMemo(() => buildTouchDigitOverlap(laserHits, activeDir, allDraws.slice(-5)), [laserHits, activeDir, allDraws])
 
+  const showPuzzleOverview = panelOpen && selectedNumber != null && sideTab === 'puzzles'
+  const puzzleDrawNumber = puzzleDraw === 'latest' ? allDraws.length : Number(puzzleDraw)
+  const puzzleOverview = useMemo(() => {
+    if (!showPuzzleOverview || !draws.length) return { boxes: [], ranking: [], lShapes: [] }
+    const colIdx = puzzleDrawNumber - 1 - (allDraws.length - draws.length)
+    const recentDraws = allDraws.slice(-5)
+    const boxes = buildPuzzleBoxes(draws, colIdx, activeDir, recentDraws)
+    const totals = new Map()
+    boxes.forEach(({ seed, values }) => {
+      values.forEach(item => {
+        const entry = totals.get(item.n) || { number: item.n, seeds: [], totalStrength: 0 }
+        entry.seeds.push(seed)
+        entry.totalStrength += item.pairCount + item.tripleCount + item.recentCount
+        totals.set(item.n, entry)
+      })
+    })
+    const ranking = [...totals.values()]
+      .map(item => ({ ...item, avgStrength: item.totalStrength / item.seeds.length }))
+      .sort((a, b) => b.seeds.length - a.seeds.length || b.avgStrength - a.avgStrength || a.number - b.number)
+    return { boxes, ranking, lShapes: analyzePuzzleLShapes(boxes) }
+  }, [showPuzzleOverview, puzzleDrawNumber, draws, allDraws, activeDir])
+
   useEffect(() => {
-    if (!selectedNumber || !touchDigitData) return
+    if (showPuzzleOverview || !selectedNumber || !touchDigitData) return
     const captureKey = `${selectedNumber}-${selectedCell?.colIdx ?? 'row'}-${Object.values(activeDir).map(v => (v ? 1 : 0)).join('')}`
     if (captureSeenRef.current.has(captureKey)) return
 
-    const pool = (touchDigitData.exact?.length ? touchDigitData.exact : touchDigitData.common || []).slice(0, 20)
+    const pool = getCapturePool(touchDigitData)
     if (!pool.length) return
 
     setRepeatCaptureMap(prev => {
@@ -723,17 +584,9 @@ export default function HotGrid() {
     })
 
     captureSeenRef.current.add(captureKey)
-  }, [selectedNumber, selectedCell, touchDigitData, activeDir])
+  }, [showPuzzleOverview, selectedNumber, selectedCell, touchDigitData, activeDir])
 
-  const repeatCaptureList = useMemo(() => {
-    return Object.values(repeatCaptureMap)
-      .map(item => ({
-        ...item,
-        seedCount: (item.seeds || []).length,
-        avgStrength: item.hitCount ? +(item.totalStrength / item.hitCount).toFixed(2) : 0,
-      }))
-      .sort((a, b) => b.seedCount - a.seedCount || b.hitCount - a.hitCount || b.avgStrength - a.avgStrength || a.number - b.number)
-  }, [repeatCaptureMap])
+  const repeatCaptureList = useMemo(() => rankRepeatCaptures(Object.values(repeatCaptureMap)), [repeatCaptureMap])
 
   const repeatStrong = useMemo(() => repeatCaptureList.filter(item => item.seedCount >= 2), [repeatCaptureList])
 
@@ -746,8 +599,115 @@ export default function HotGrid() {
 
   const lastDraw = allDraws[allDraws.length - 1] || []
 
+  const puzzlePanel = (
+        <section className="hg-puzzle-overview" aria-label="All puzzle values">
+          <div className="hg-puzzle-toolbar">
+            <h2 className="hg-analysis-title">All Puzzle Values {draws.length > 0 && `- D${puzzleDrawNumber}`}</h2>
+            <label className="hg-puzzle-draw-label">
+              Draw
+              <select className="hg-history-input" value={puzzleDraw} disabled={!draws.length}
+                onChange={event => setPuzzleDraw(event.target.value)}>
+                <option value="latest">Latest{allDraws.length > 0 ? ` - D${allDraws.length}` : ''}</option>
+                {draws.slice(0, -1).map((draw, idx) => {
+                  const number = allDraws.length - draws.length + idx + 1
+                  return <option key={number} value={number}>D{number} - {draw.join(', ')}</option>
+                }).reverse()}
+              </select>
+            </label>
+          </div>
+          <p className="hg-history-note">
+            All seed boxes for one draw, calculated automatically using the active directions and {draws.length}-draw grid window.
+            Choose ALL above to select older draws. Each box uses the same top 20 values as Repeat Capture.
+            Historical selections use the current grid and latest five draws, just like manual inspection; this is not a historical prediction.
+          </p>
+          {!draws.length ? (
+            <p className="hg-tab-empty">No draws available.</p>
+          ) : (
+            <>
+              {!Object.values(activeDir).some(Boolean) && <p className="hg-tab-empty">Enable at least one direction above to calculate values.</p>}
+              <div className="hg-history-card hg-puzzle-ranking">
+                <h3 className="hg-history-card-title">Combined values - most repeated first</h3>
+                <p className="hg-history-note">Counts show distinct seed boxes, not clicks. Outlined values appear in two or more boxes.</p>
+                {puzzleOverview.ranking.length ? (
+                  <div className="hg-puzzle-values">
+                    {puzzleOverview.ranking.map(item => (
+                      <div key={item.number} className={`hg-capture-pill ${item.seeds.length >= 2 ? 'hg-puzzle-repeat' : ''}`}
+                        title={`Seeds: ${item.seeds.join(', ')}; average strength: ${item.avgStrength.toFixed(2)}`}>
+                        <span>{item.number}</span>
+                        <small>{item.seeds.length} / {puzzleOverview.boxes.length} seeds</small>
+                        <small>Seeds: {item.seeds.join(', ')}</small>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="hg-tab-empty">No capture values for this draw and these directions.</p>}
+              </div>
+              <section className="hg-history-card hg-lshape-panel" aria-label="L-shape calculations">
+                <h3 className="hg-history-card-title">L-shape calculations - repeated exact results</h3>
+                <p className="hg-history-note">
+                  Checks touching three-cell L shapes in every orientation within each six-column seed box.
+                  Uses whole numbers or digit sums with addition and subtraction; the answer must match the third cell.
+                  Strong means at least 2 different number pairs, not repeated formulas from the same pair.
+                  These are arithmetic matches for reference, not a prediction of the next draw.
+                </p>
+                {puzzleOverview.lShapes.length ? (
+                  <div className="hg-lshape-results">
+                    {puzzleOverview.lShapes.map(result => (
+                      <article key={result.number} className={`hg-lshape-result ${result.strong ? 'hg-lshape-strong' : ''}`}
+                        aria-label={`L-shape result ${result.number}`}>
+                        <div className="hg-capture-head-row">
+                          <span className="hg-capture-num">{result.number}</span>
+                          {result.strong && <strong className="hg-lshape-strength">Strong</strong>}
+                        </div>
+                        <p className="hg-history-note">
+                          {result.pairCount} distinct pairs | {result.matchCount} L matches | {result.seedCount} seed boxes
+                        </p>
+                        <code className="hg-lshape-formula">{result.matches[0].formulas[0]}</code>
+                        <details>
+                          <summary>Show all matching cells and formulas</summary>
+                          <ol className="hg-lshape-matches">
+                            {result.matches.map(match => (
+                              <li key={match.key}>
+                                <strong>Seed {match.seed} - D{puzzleDrawNumber}</strong>
+                                <div className="hg-history-note">
+                                  Pair: {match.operands.map(cell => `${cell.number} at R${cell.row}C${cell.column}`).join(' and ')}
+                                  {'; '}result: {match.target.number} at R{match.target.row}C{match.target.column}
+                                </div>
+                                {match.formulas.map(formula => <code className="hg-lshape-formula" key={formula}>{formula}</code>)}
+                              </li>
+                            ))}
+                          </ol>
+                        </details>
+                      </article>
+                    ))}
+                  </div>
+                ) : <p className="hg-tab-empty">No exact L-shape matches for this draw and these directions.</p>}
+              </section>
+              <div className="hg-puzzle-boxes">
+                {puzzleOverview.boxes.map(box => (
+                  <article className="hg-history-card hg-puzzle-box" key={box.seed} aria-label={`Seed ${box.seed}`}>
+                    <h3 className="hg-history-card-title">Seed <span className="hg-num-badge">{box.seed}</span> - D{puzzleDrawNumber}</h3>
+                    <p className="hg-history-note">Touched values: {box.touched.join(', ') || 'none'}</p>
+                    <div className="hg-history-examples-title">All captured values (latest ranking)</div>
+                    <div className="hg-capture-all-grid">
+                      {box.values.map(item => (
+                        <div className="hg-capture-pill" key={item.n}
+                          title={`${item.pairCount} pairs, ${item.tripleCount} triples, ${item.recentCount} recent draws\n${item.labels.slice(0, 3).join('\n')}`}>
+                          <span>{item.n}</span>
+                          <small>{item.seedCount}s</small>
+                        </div>
+                      ))}
+                    </div>
+                    {!box.values.length && <p className="hg-tab-empty">No capture values for this seed.</p>}
+                  </article>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+  )
+
   return (
-    <div className="hg-page">
+    <div className={`hg-page ${showPuzzleOverview ? 'hg-puzzle-mode' : ''}`}>
       <div className="hg-header">
         <div>
           <h1 className="hg-title">Hot Number Grid</h1>
@@ -771,7 +731,7 @@ export default function HotGrid() {
               <button
                 key={opt}
                 className={`hg-wbtn ${window_ === opt ? 'active' : ''}`}
-                onClick={() => { setWindow(opt); setSelectedCell(null) }}
+                onClick={() => { setWindow(opt); setSelectedCell(null); setPuzzleDraw('latest') }}
               >{opt}</button>
             ))}
           </div>
@@ -854,6 +814,7 @@ export default function HotGrid() {
                 return (
                   <div
                     key={n}
+                    className="hg-grid-row"
                     style={{
                       position: 'absolute',
                       top: rowIdx * CELL_H,
@@ -917,26 +878,30 @@ export default function HotGrid() {
               {/* Header */}
               <div className="hg-analysis-header">
                 <span className="hg-analysis-title">
+                  {showPuzzleOverview ? 'Draw overview' : <>
                   <span className="hg-num-badge">{selectedNumber}</span>
                   {selectedCell && <span className="hg-cell-ref"> D{allDraws.length - draws.length + selectedCell.colIdx + 1}</span>}
+                  </>}
                 </span>
-                <button className="hg-close-btn" onClick={handleClose}>✕</button>
+                <button className="hg-close-btn" aria-label="Close analysis panel" onClick={handleClose}>✕</button>
               </div>
 
-              {/* Stats row always visible */}
+              {!showPuzzleOverview && (
               <div className="hg-stats-row">
                 <div className="hg-stat"><strong>{freq[selectedNumber]}</strong><span>last {draws.length}</span></div>
                 <div className="hg-stat"><strong>{allDraws.filter(d => d.includes(selectedNumber)).length}</strong><span>all-time</span></div>
                 <div className="hg-stat"><strong>{gapMap[selectedNumber] || 0}</strong><span>gap</span></div>
                 <div className="hg-stat"><strong>{((allDraws.filter(d => d.includes(selectedNumber)).length / (allDraws.length || 1)) * 100).toFixed(1)}%</strong><span>hit rate</span></div>
               </div>
+              )}
 
               {/* Tabs */}
-              <div className="hg-tabs">
+              <div className="hg-tabs hg-lotto-tabs">
                 {[
                   { key: 'touch', label: 'Touch' },
                   { key: 'math',  label: `Math ${mathCandidates.length ? `(${mathCandidates.length})` : ''}` },
                   { key: 'capture', label: `Repeat Capture ${repeatStrong.length ? `(${repeatStrong.length})` : ''}` },
+                  { key: 'puzzles', label: 'All Puzzle Values' },
                   { key: 'history', label: 'Step History' },
                   { key: 'pair', label: 'Digit Calc' },
                   { key: 'ai', label: 'AI Analyzer' },
@@ -945,10 +910,13 @@ export default function HotGrid() {
                   <button
                     key={t.key}
                     className={`hg-tab ${sideTab === t.key ? 'active' : ''}`}
+                    aria-pressed={sideTab === t.key}
                     onClick={() => setSideTab(t.key)}
                   >{t.label}</button>
                 ))}
               </div>
+
+              {showPuzzleOverview && puzzlePanel}
 
               {/* ── TOUCH TAB ── */}
               {sideTab === 'touch' && (

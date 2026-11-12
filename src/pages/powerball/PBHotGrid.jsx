@@ -854,6 +854,7 @@ export default function HotGrid() {
                 return (
                   <div
                     key={n}
+                    className="hg-grid-row"
                     style={{
                       position: 'absolute',
                       top: rowIdx * CELL_H,

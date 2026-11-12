@@ -478,3 +478,149 @@
   .hg-body { flex-direction:column; }
   .hg-grid-area { max-height:55vh; }
 }
+
+.hg-lotto-tabs { display:grid;grid-template-columns:repeat(4,minmax(0,1fr)); }
+.hg-puzzle-mode .hg-grid-area,
+.hg-puzzle-mode .hg-debug-bar,
+.hg-puzzle-mode .hg-freq-summary { display:none; }
+.hg-puzzle-mode .hg-side { width:100%;max-height:none;overflow:visible;border-left:none; }
+.hg-puzzle-overview { padding:0 16px 16px; }
+.hg-puzzle-toolbar { display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap; }
+.hg-puzzle-draw-label { display:flex;align-items:center;gap:8px;font-size:12px; }
+.hg-puzzle-draw-label select { width:auto;max-width:100%; }
+.hg-puzzle-ranking { margin:12px 0; }
+.hg-puzzle-boxes { display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr));gap:10px; }
+.hg-puzzle-box .hg-capture-pill { font-family:Arial,sans-serif;cursor:default; }
+.hg-puzzle-values { display:flex;flex-wrap:wrap;gap:5px;margin-top:8px; }
+.hg-puzzle-values .hg-capture-pill { min-width:34px;cursor:default; }
+.hg-puzzle-values .hg-puzzle-repeat { border:2px solid #4fa3ff; }
+.hg-puzzle-box .hg-history-note { line-height:1.5; }
+.hg-puzzle-overview > .hg-history-note { max-width:100ch;line-height:1.5; }
+.hg-lshape-panel { margin-bottom:12px; }
+.hg-lshape-panel .hg-history-note { line-height:1.5; }
+.hg-lshape-results { display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:8px;margin-top:10px; }
+.hg-lshape-result { min-width:0;padding:8px;border:1px solid #2a2a40;border-radius:5px; }
+.hg-lshape-strong { border-color:#86efac; }
+.hg-lshape-strength { color:#86efac;font-size:11px; }
+.hg-lshape-formula { display:block;font-size:11px;margin:5px 0;overflow-wrap:anywhere; }
+.hg-lshape-result summary { cursor:pointer;font-size:11px; }
+.hg-lshape-matches { padding-left:18px;font-size:11px; }
+.hg-lshape-matches li { margin-top:8px;overflow-wrap:anywhere; }
+
+/* ── Print theme ──
+   The on-screen UI is dark, but printing the near-black panels as-is
+   soaks the page in ink. This swaps the dark fills for white/light-gray
+   and darkens the pale/neon text so printouts stay readable while using
+   far less ink. Screen appearance is unaffected. */
+@media print {
+  .hg-lshape-result { color:#1a1a1a;border-color:#ccc;break-inside:avoid; }
+  .hg-lshape-strong { border-color:#15803d; }
+  .hg-lshape-strength { color:#15803d; }
+  .hg-puzzle-boxes { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .hg-puzzle-box, .hg-puzzle-values .hg-capture-pill { break-inside:avoid; }
+  .hg-puzzle-overview .hg-history-card { background:#fff !important; }
+  .hg-puzzle-values .hg-puzzle-repeat { border-color:#334155 !important; }
+  .hg-page { background:#fff !important;color:#1a1a1a !important; }
+
+  .hg-header { border-bottom-color:#ddd !important; }
+  .hg-labels-col { border-right-color:#ddd !important; }
+  .hg-label-header,
+  .hg-col-headers,
+  .hg-side {
+    background:#fff !important;
+    border-color:#ddd !important;
+  }
+  .hg-label-row,
+  .hg-grid-row { background:#fff !important;border-bottom-color:#eee !important; }
+
+  /* Cards / buttons that used flat near-black fills */
+  .hg-laser-strip,
+  .hg-follows-block,
+  .hg-math-inputs,
+  .hg-math-row,
+  .hg-history-card,
+  .hg-history-next-pill,
+  .hg-pair-example,
+  .hg-ai-query-box,
+  .hg-ai-stat,
+  .hg-capture-item,
+  .hg-capture-pill,
+  .hg-touch-exact-pill,
+  .hg-debug-bar,
+  .hg-history-dir-btn,
+  .hg-dir-btn,
+  .hg-wbtn,
+  .hg-stat,
+  .hg-history-input,
+  .hg-pair-clear-btn,
+  .hg-capture-clear-btn {
+    background:#f6f7fb !important;
+    border-color:#ddd !important;
+  }
+
+  .hg-freq-bar-wrap,
+  .hg-follow-bar-wrap { background:#e8e8ee !important; }
+
+  .hg-wbtn.active,
+  .hg-num-badge { background:#f5a623 !important;color:#000 !important; }
+
+  .hg-tab.active { background:#fdf0da !important; }
+  .hg-cell-on,
+  .hg-cell-lat.hg-cell-on,
+  .hg-cell-nhigh { background:#f6e4b0 !important; }
+  .hg-cell-lat.hg-cell-off { background:#eaf2ff !important; }
+  .hg-cell-sel { outline-color:#1a1a1a !important; }
+  .hg-cell-num { color:rgba(0,0,0,.75) !important; }
+
+  /* Pale/near-white text that would vanish on a white background */
+  .hg-num,
+  .hg-analysis-title,
+  .hg-beam-num,
+  .hg-follow-num,
+  .hg-history-num,
+  .hg-pair-formula,
+  .hg-ai-query-value,
+  .hg-history-input,
+  .hg-math-expr,
+  .hg-dir-btn.active,
+  .hg-bubble-n { color:#1a1a1a !important; }
+
+  /* Pale slate/lavender meta text */
+  .hg-history-card-title,
+  .hg-history-example-id,
+  .hg-capture-meta,
+  .hg-touch-exact-meta,
+  .hg-pair-card-line,
+  .hg-history-example-next,
+  .hg-ai-match-next,
+  .hg-pair-strong,
+  .hg-pair-example,
+  .hg-history-next-pill,
+  .hg-pair-clear-btn,
+  .hg-capture-clear-btn,
+  .hg-capture-pill,
+  .hg-pair-card-expr,
+  .hg-ai-match-head { color:#334155 !important; }
+
+  /* Gold/amber accents (too light on white) */
+  .hg-tag-hit,
+  .hg-math-top .hg-math-num,
+  .hg-math-top .hg-math-expr,
+  .hg-math-top .hg-math-score,
+  .hg-pair-picked-chip,
+  .hg-touch-exact-formula,
+  .hg-capture-seeds { color:#9a6b00 !important; }
+
+  /* Sky-blue / green accents */
+  .hg-capture-num,
+  .hg-touch-exact-draws { color:#0369a1 !important; }
+  .hg-touch-exact-title,
+  .hg-touch-exact-num { color:#15803d !important; }
+
+  /* Neon direction/status accents */
+  .hg-dir-ne, .hg-dir-btn-ne.active { color:#0e7490 !important;border-color:#0e7490 !important; }
+  .hg-dir-nw, .hg-dir-btn-nw.active { color:#a21caf !important;border-color:#a21caf !important; }
+  .hg-dir-sw, .hg-dir-btn-sw.active { color:#15803d !important;border-color:#15803d !important; }
+  .hg-dbg-hit { color:#0d9488 !important; }
+  .hg-bubble-f { color:#555 !important; }
+}

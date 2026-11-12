@@ -230,6 +230,23 @@ Form to submit new draw result:
 
 ---
 
+### 5.10 Lotto Hot Grid (`/lotto/hotgrid`)
+
+- Open the Lotto analysis panel by selecting a grid number or gold cell. **All Puzzle Values** is the panel tab immediately beside **Repeat Capture**; it automatically shows every seed box without inspecting each cell.
+- The panel expands to the full width for this tab, keeping the same tab row visible. Select **Repeat Capture**, **Touch**, or another panel tab to return to the grid layout.
+- Defaults to the latest draw; use the **Draw** selector for any earlier draw in the current window. Choose **ALL** to access the full history. Changing the window resets the selector to Latest.
+- Shows each seed's touched numbers and the same top 20 calculation values used by Repeat Capture (exact matches when available, otherwise common values).
+- Each seed box uses Repeat Capture's ranking and six-column number-cell layout, including the `1s` count labels. Its number positions match a fresh capture of that same seed cell with the same draw window and directions; manual captures accumulated across multiple cells can have a different ranking.
+- The combined ranking counts distinct seed boxes, with average calculation strength breaking ties. Values found in at least two boxes are outlined, and their seed numbers are listed.
+- **L-shape calculations**, below the combined ranking, checks all touching L-shaped triples within each six-column seed box, including rotations and reflections. Any of the three cells can be the result; the other two are operands. Each operand may be its whole number or the sum of its digits, using addition or subtraction in either order. Results must equal the actual third cell, for example `43 - (3 + 4) = 36`.
+- L-shape results rank by distinct numeric operand pairs, then seed-box count, match count, and number. **Strong** means at least two different pairs produce that result; repeating a pair in another box or using several formulas does not increase its distinct-pair count. Expand a result to see every formula with seed, draw, and 1-based row/column references. Straight lines, gaps, row wrapping, and pairs from different seed boxes do not count. These are arithmetic references, not predictive confidence.
+- Run the focused L-shape checks with `node --test scripts/puzzle-l-shapes.test.mjs`.
+- Run `node scripts/backtest-puzzle-l-shapes.mjs` for a next-draw audit of the latest 200 eligible transitions. Unlike the retrospective Draw selector, this test truncates the entire history before each target draw, including the 100-draw beam window and last-five filter. It uses the same capture/ranking/L-shape helpers as the UI and reports top-5, top-10, all-Strong, and frequency-top-5 hits alongside the fair 5/45 chance expectation.
+- Backtest options: `--file <history.json>`, `--end <last-target-draw>`, `--count <transitions>`, and `--output <report.json>`. Input is a chronological array of five-number arrays. By default, an exactly repeated consecutive tail block is excluded with an explicit warning; the input file is never modified. Reports include every next-draw comparison, misses, and formula evidence.
+- Active direction controls and the grid window apply to all boxes. Historical selections use the current window and the latest five draws, matching manual inspection rather than simulating a historical prediction.
+- Opening this overview does not add to or clear manual Repeat Capture results.
+- The overview prints with white cards and dark text. Powerball and Mega Millions are unchanged.
+
 ## 6. Key Components
 
 ### 6.1 Grid.jsx
