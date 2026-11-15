@@ -697,6 +697,10 @@ Serverless function that:
 - Forwards to OpenAI API with lottery-specific system prompt
 - Returns AI response for in-app chat assistant
 
+The function uses the named ES-module export `handler`, matching `"type": "module"` in `package.json`.
+Run `node --test scripts/ai-chat.test.mjs` to check module loading and handler behavior.
+The frontend's `npm run build` does not validate Netlify function bundling.
+
 ### 12.3 Environment Variables (Netlify)
 ```
 VITE_SUPABASE_URL=...
