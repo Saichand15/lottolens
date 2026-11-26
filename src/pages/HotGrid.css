@@ -523,6 +523,35 @@
 .hg-lshape-matches { padding-left:18px;font-size:11px; }
 .hg-lshape-matches li { margin-top:8px;overflow-wrap:anywhere; }
 
+.hg-compare-panel { margin-top:12px; }
+.hg-compare-grid { display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;max-width:620px;margin:16px 0; }
+.hg-compare-cell { display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-width:0;padding:12px 4px;border:2px solid #cbd5e1;border-radius:8px;background:#fff;color:#1e293b; }
+button.hg-compare-cell { cursor:pointer; }
+button.hg-compare-cell:hover, button.hg-compare-cell:focus-visible { border-color:#0369a1; }
+.hg-compare-cell strong { font-size:22px; }
+.hg-compare-cell small { font-size:11px; }
+.hg-compare-results { display:flex;flex-wrap:wrap;gap:8px; }
+.hg-compare-results .hg-compare-cell { min-width:120px; }
+.hg-compare-dialog { width:min(760px,calc(100% - 32px));max-height:85vh;overflow:auto;box-sizing:border-box;padding:20px;border:2px solid #64748b;border-radius:12px;background:#fff;color:#1e293b; }
+.hg-compare-dialog::backdrop { background:rgba(15,23,42,.65); }
+.hg-compare-dialog p { font-size:13px;line-height:1.5; }
+.hg-compare-formula { display:block;font-size:18px;font-weight:700;overflow-wrap:anywhere; }
+.hg-compare-navigation { display:flex;gap:8px; }
+.hg-compare-navigation select { flex:1;min-width:0; }
+.hg-compare-navigation button, .hg-compare-navigation select { padding:8px;border:1px solid #64748b;border-radius:4px;background:#fff;color:#1e293b; }
+.hg-compare-navigation button:disabled { opacity:.4; }
+.hg-compare-operand { border-color:#0369a1;background:#e0f2fe;animation:hg-compare-pulse 1.5s ease-in-out 3; }
+.hg-compare-cell.hg-compare-exact { border-color:#15803d;background:#dcfce7;animation:hg-compare-pulse 1.5s ease-in-out 3; }
+.hg-compare-cell.hg-compare-near { border-color:#a16207;background:#fef3c7;animation:hg-compare-pulse 1.5s ease-in-out 3; }
+.hg-compare-count { outline:2px solid #0369a1;outline-offset:2px; }
+.hg-compare-status { font-weight:700; }
+.hg-compare-status.hg-compare-exact { color:#15803d; }
+.hg-compare-status.hg-compare-near { color:#a16207; }
+@keyframes hg-compare-pulse { 50% { box-shadow:0 0 0 3px currentColor; } }
+@media (prefers-reduced-motion:reduce) {
+  .hg-compare-operand, .hg-compare-cell.hg-compare-exact, .hg-compare-cell.hg-compare-near { animation:none; }
+}
+
 /* ── Print theme ──
    The on-screen UI is dark, but printing the near-black panels as-is
    soaks the page in ink. This swaps the dark fills for white/light-gray

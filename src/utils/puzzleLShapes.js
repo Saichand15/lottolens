@@ -1,6 +1,6 @@
 const COLUMNS = 6
 
-function numberForms(number) {
+export function numberForms(number) {
   const digits = String(number).split('').map(Number)
   const sum = digits.reduce((total, digit) => total + digit, 0)
   const forms = [{ value: number, label: String(number) }]

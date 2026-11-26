@@ -5,6 +5,7 @@ import { buildTransitionMatrix, buildCoOccurrence, buildGapMap } from '../utils/
 import { analyzePuzzleLShapes } from '../utils/puzzleLShapes'
 import { splitPairDigits, buildTouchDigitOverlap, getCapturePool, rankRepeatCaptures, buildPuzzleBoxes } from '../utils/puzzleCapture'
 import LaserLayer from '../components/LaserLayer'
+import PuzzleCompare from '../components/PuzzleCompare'
 import './HotGrid.css'
 
 const WINDOW_OPTIONS = [20, 50, 100, 200, 'ALL']
@@ -522,7 +523,7 @@ export default function HotGrid() {
   const pairCalcData = useMemo(() => buildDigitPairCalculator(pairInputValue, MAXN), [pairInputValue])
   const touchDigitData = useMemo(() => buildTouchDigitOverlap(laserHits, activeDir, allDraws.slice(-5)), [laserHits, activeDir, allDraws])
 
-  const showPuzzleOverview = panelOpen && selectedNumber != null && sideTab === 'puzzles'
+  const showPuzzleOverview = panelOpen && selectedNumber != null && (sideTab === 'puzzles' || sideTab === 'compare')
   const puzzleDrawNumber = puzzleDraw === 'latest' ? allDraws.length : Number(puzzleDraw)
   const puzzleOverview = useMemo(() => {
     if (!showPuzzleOverview || !draws.length) return { boxes: [], ranking: [], lShapes: [] }
@@ -590,6 +591,17 @@ export default function HotGrid() {
 
   const repeatStrong = useMemo(() => repeatCaptureList.filter(item => item.seedCount >= 2), [repeatCaptureList])
 
+  const comparisonGrids = useMemo(() => [
+    { id: 'capture', label: 'Accumulated Repeat Capture (current session)', values: repeatCaptureList.slice(0, 24) },
+    {
+      id: 'combined', label: `Combined all-seed values - D${puzzleDrawNumber}`,
+      values: puzzleOverview.ranking.map(item => ({ ...item, seedCount: item.seeds.length })),
+    },
+    ...puzzleOverview.boxes.map(box => ({
+      id: `seed-${box.seed}`, label: `Seed ${box.seed} - D${puzzleDrawNumber}`, values: box.values,
+    })),
+  ], [repeatCaptureList, puzzleOverview, puzzleDrawNumber])
+
   const clearRepeatCapture = useCallback(() => {
     setRepeatCaptureMap({})
     captureSeenRef.current = new Set()
@@ -599,10 +611,7 @@ export default function HotGrid() {
 
   const lastDraw = allDraws[allDraws.length - 1] || []
 
-  const puzzlePanel = (
-        <section className="hg-puzzle-overview" aria-label="All puzzle values">
-          <div className="hg-puzzle-toolbar">
-            <h2 className="hg-analysis-title">All Puzzle Values {draws.length > 0 && `- D${puzzleDrawNumber}`}</h2>
+  const puzzleDrawSelector = (
             <label className="hg-puzzle-draw-label">
               Draw
               <select className="hg-history-input" value={puzzleDraw} disabled={!draws.length}
@@ -614,6 +623,13 @@ export default function HotGrid() {
                 }).reverse()}
               </select>
             </label>
+  )
+
+  const puzzlePanel = (
+        <section className="hg-puzzle-overview" aria-label="All puzzle values">
+          <div className="hg-puzzle-toolbar">
+            <h2 className="hg-analysis-title">All Puzzle Values {draws.length > 0 && `- D${puzzleDrawNumber}`}</h2>
+            {puzzleDrawSelector}
           </div>
           <p className="hg-history-note">
             All seed boxes for one draw, calculated automatically using the active directions and {draws.length}-draw grid window.
@@ -899,6 +915,7 @@ export default function HotGrid() {
               <div className="hg-tabs hg-lotto-tabs">
                 {[
                   { key: 'touch', label: 'Touch' },
+                  { key: 'compare', label: 'Compare' },
                   { key: 'math',  label: `Math ${mathCandidates.length ? `(${mathCandidates.length})` : ''}` },
                   { key: 'capture', label: `Repeat Capture ${repeatStrong.length ? `(${repeatStrong.length})` : ''}` },
                   { key: 'puzzles', label: 'All Puzzle Values' },
@@ -916,7 +933,21 @@ export default function HotGrid() {
                 ))}
               </div>
 
-              {showPuzzleOverview && puzzlePanel}
+              {sideTab === 'puzzles' && showPuzzleOverview && puzzlePanel}
+              {sideTab === 'compare' && showPuzzleOverview && (
+                <section className="hg-puzzle-overview">
+                  <div className="hg-puzzle-toolbar">
+                    <h2 className="hg-analysis-title">Visual Comparison</h2>
+                    {puzzleDrawSelector}
+                  </div>
+                  <p className="hg-history-note">
+                    Automatic grids use the selected draw, active directions, current window and latest five draws, as in All Puzzle Values.
+                    Accumulated captures keep their session ranking and counts; the Draw selector does not change them.
+                  </p>
+                  {!Object.values(activeDir).some(Boolean) && <p>Enable a direction to populate automatic grids.</p>}
+                  <PuzzleCompare grids={comparisonGrids} />
+                </section>
+              )}
 
               {/* ── TOUCH TAB ── */}
               {sideTab === 'touch' && (
